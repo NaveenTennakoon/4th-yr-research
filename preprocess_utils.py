@@ -1,172 +1,252 @@
-import cv2
+"""
+Extract frames from a video (or many videos). 
+Plus some frame/image manipulation utilities.
+"""
+
 import os
+import glob
+import warnings
+import subprocess
 import numpy as np
+import pandas as pd
+import cv2
 
-def extract_frames(video:str) -> np.array:
-    """ Extract the frameset from a given video path
+def image_resize_aspectratio(arImage: np.array, minDim:int = 256) -> np.array:
+    nHeigth, nWidth, _ = arImage.shape
+
+    if nWidth >= nHeigth:
+        # wider than high => map heigth to 224
+        fRatio = minDim / nHeigth
+    else: 
+        fRatio = minDim / nWidth
+
+    if fRatio != 1.0:
+        arImage = cv2.resize(arImage, dsize = (0,0), fx = fRatio, fy = fRatio, interpolation=cv2.INTER_LINEAR)
+
+    return arImage
+
+def images_resize_aspectratio(arImages: np.array, minDim:int = 256) -> np.array:
+    nImages, _, _, _ = arImages.shape
+    liImages = []
+    for i in range(nImages):
+        arImage = image_resize_aspectratio(arImages[i, ...], minDim)
+        liImages.append(arImage)
+    return np.array(liImages)
+
+def video2frames(sVideoPath:str, resizeMinDim:int) -> np.array:
+    """ Read video file with OpenCV and return array of frames
+
+    if nMinDim != None: Frames are resized preserving aspect ratio 
+        so that the smallest dimension is eg 256 pixels, with bilinear interpolation
     """
+  
+    # Create a VideoCapture object and read from input file
+    oVideo = cv2.VideoCapture(sVideoPath)
+    if (oVideo.isOpened() == False): raise ValueError("Error opening video file")
 
-    name = os.path.abspath(video)
-    cap = cv2.VideoCapture(name)
-    return_frames = []
+    liFrames = []
 
+    # Read until video is completed
     while(True):
-        ret, frame = cap.read()
-        if ret == False:
-            break
-        return_frames.append(frame)
-    
-    return np.array(return_frames)
-
-def get_grayscale_images(frames:np.array) -> np.array:
-    """ Returns grayscale images for provided set of frames as numpy arrays
-    """
-
-    return_frames = []
-
-    for frame_num in range(frames.shape[0]):
-        gray_image = get_grayscale_image(frames[frame_num, ...])
-        return_frames.append(gray_image)
-
-    return np.array(return_frames)
-
-def get_grayscale_image(frame:np.array) -> np.array:
-    """ Returns a grayscale image of the provided frame
-    """  
-
-    gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    return gray_image
-
-def fdc_keyframes(frames:np.array, thres:int) -> np.array:
-    """ Extract keyframes by calculating absolute frame difference
-    through frame iteration. 'thres' provides the threshold value.
-    If the frame difference is below the threshold, the current frame
-    is ignored and the next frame is taken
-    """
-
-    return_frames = []
-
-    for frame_num in range(frames.shape[0] - 1):
-        if(frame_num == 0):
-            prvs = frames[frame_num, ...]
-            return_frames.append(prvs)
-        next = frames[frame_num+1, ...]
-        diff = cv2.absdiff(next, prvs)
-        non_zero_count = np.count_nonzero(diff)
-        if non_zero_count > thres:
-            return_frames.append(next)
-            prvs = next
-
-    return np.array(return_frames)
-
-def frames_downsample(frames:np.array, nFramesTarget:int) -> np.array:
-    """ Adjust number of frames (eg 123) to nFramesTarget (eg 79)
-    works also if originally less frames than nFramesTarget
-    """
-
-    nSamples, _, _, _ = frames.shape
-    if nSamples == nFramesTarget: return frames
-
-    fraction = nSamples / nFramesTarget
-    index = [int(fraction * i) for i in range(nFramesTarget)]
-    liTarget = [frames[i, ...] for i in index]
-
-    return np.array(liTarget)
-
-def calculate_optflow(frames:np.array, algorithm:str='dtvl1') -> np.array:
-    hsv = np.zeros_like(frames[0, ...])
-    hsv[...,1] = 255
-    return_frames = []
-
-    for frame_num in range(frames.shape[0] - 1):
-        # Farneback algorithm
-        # flow = cv2.calcOpticalFlowFarneback(frames[frame_num, :, :, :], frames[frame_num+1, :, :, :], None, 0.5, 3, 5, 3, 5, 1.2, 0)
-
-        # tv-l1 dual optical flow
-        # optical_flow = cv2.optflow.DualTVL1OpticalFlow_create(scaleStep = 0.5, warps = 3, epsilon = 0.02)
         
-        # tv-l1 dual optical flow - very fast
-        # optical_flow = cv2.optflow.DualTVL1OpticalFlow_create(theta = 0.1, nscales = 1, scaleStep = 0.5, warps = 1, epsilon = 0.1)
-        optical_flow = cv2.optflow.DualTVL1OpticalFlow_create()
-        flow = optical_flow.calc(frames[frame_num, :, :, :], frames[frame_num+1, :, :, :], None)
+        (bGrabbed, arFrame) = oVideo.read()
+        if bGrabbed == False: break
+
+        if resizeMinDim != None:
+            # resize image
+            arFrameResized = image_resize_aspectratio(arFrame, resizeMinDim)
+
+		# Save the resulting frame to list
+        liFrames.append(arFrameResized)
+   
+    return np.array(liFrames)
+
+def frames2files(arFrames:np.array, sTargetDir:str):
+    """ Write array of frames to jpg files
+    Input: arFrames = (number of frames, height, width, depth)
+    """
+
+    os.makedirs(sTargetDir, exist_ok=True)
+    for nFrame in range(arFrames.shape[0]):
+        cv2.imwrite(sTargetDir + "/frame%04d.jpg" % nFrame, arFrames[nFrame, :, :, :])
+
+    return
+
+def files2frames(path:str) -> np.array:
+    # important to sort image files upfront
+    liFiles = sorted(glob.glob(path + "/*.jpg"))
+    if len(liFiles) == 0: raise ValueError("No frames found in " + path)
+
+    liFrames = []
+    # loop through frames
+    for frame in liFiles:
+        arFrame = cv2.imread(frame)
+        liFrames.append(arFrame)
+
+    return np.array(liFrames)   
+    
+def frames_downsample(arFrames:np.array, targetNum:int) -> np.array:
+    """ Adjust number of frames (eg 123) to targetNum (eg 79)
+    works also if originally less frames then targetNum
+    """
+
+    nSamples, _, _, _ = arFrames.shape
+    if nSamples == targetNum: return arFrames
+
+    # down/upsample the list of frames
+    fraction = nSamples / targetNum
+    index = [int(fraction * i) for i in range(targetNum)]
+    targetFrames = [arFrames[i,:,:,:] for i in index]
+
+    return np.array(targetFrames)   
+    
+def image_crop(arFrame:np.array, targetHeight:int, targetWidth:int) -> np.array:
+    """ crop 1 frame to specified size, choose centered image
+    """
+
+    height, width, _ = arFrame.shape
+
+    if (height < targetHeight) or (width < targetWidth):
+        raise ValueError("Image height/width too small to crop to target size")
+
+    # calc left upper corner of target image
+    sX = int(width/2 - targetWidth/2)
+    sY = int(height/2 - targetHeight/2)
+
+    arFrame = arFrame[sY:sY+targetHeight, sX:sX+targetWidth, :]
+
+    return arFrame
+
+def images_crop(arFrames:np.array, targetHeight:int, targetWidth:int) -> np.array:
+    """ crop each frame in array to specified size, choose centered image
+    """
+
+    _, height, width, _ = arFrames.shape
+
+    if (height < targetHeight) or (width < targetWidth):
+        raise ValueError("Image height/width too small to crop to target size")
+
+    # calc left upper corner
+    sX = int(width/2 - targetWidth/2)
+    sY = int(height/2 - targetHeight/2)
+
+    arFrames = arFrames[:, sY:sY+targetHeight, sX:sX+targetWidth, :]
+
+    return arFrames
+
+def images_rescale(arFrames:np.array) -> np.array(float):
+    """ Rescale array of images (rgb 0-255) to [-1.0, 1.0]
+    """
+
+    ar_fFrames = arFrames / 127.5
+    ar_fFrames -= 1.
+
+    return ar_fFrames
+
+def images_normalize(arFrames:np.array, targetNum:int, height:int, width:int, rescale:bool = True) -> np.array(float):
+    """ Several image normalizations/preprocessing: 
+        - downsample number of frames
+        - crop to centered image
+        - rescale rgb 0-255 value to [-1.0, 1.0] - only if rescale == True
+
+    Returns array of floats
+    """
+
+    # downsample and crop the image frames
+    arFrames = frames_downsample(arFrames, targetNum)
+    arFrames = images_crop(arFrames, height, width)
+
+    if rescale:
+        # normalize to [-1.0, 1.0]
+        arFrames = images_rescale(arFrames)
+    else:
+        if np.max(np.abs(arFrames)) > 1.0: warnings.warn("Images not normalized")
+
+    return arFrames
+
+def frames_show(arFrames:np.array, waitTime:int = 100):
+
+    nFrames, _, _, _ = arFrames.shape
+    
+    for i in range(nFrames):
+        cv2.imshow("Frame", arFrames[i, :, :, :])
+        cv2.waitKey(waitTime)
+
+    return
+
+def video_length(sVideoPath:str) -> float:
+    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                             "default=noprint_wrappers=1:nokey=1", sVideoPath],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+
+    return float(result.stdout)
+
+def videosDir2framesDir(videoDir:str, frameDir:str, framesNorm:int = None, 
+    resizeMinDim:int = None, cropShape:tuple = None, classes:int = None):
+    """ Extract frames from videos 
+    
+    Input video structure: ... videoDir / train / class001 / videoname.avi
+    Output: ... frameDir / train / class001 / videoname / frames.jpg
+    """
+
+    # get videos. Assume videoDir / train / class / video.mp4
+    dfVideos = pd.DataFrame(sorted(glob.glob(videoDir + "/*/*/*.*")), columns=["videoPath"])
+    print("Located {} videos in {}, extracting to {} ..."\
+        .format(len(dfVideos), videoDir, frameDir))
+    if len(dfVideos) == 0: raise ValueError("No videos found")
+
+    # restrict to first nLabels
+    if classes != None:
+        dfVideos.loc[:,"label"] = dfVideos.videoPath.apply(lambda s: s.split("/")[-2])
+        liClasses = sorted(dfVideos.label.unique())[:classes]
+        dfVideos = dfVideos[dfVideos["label"].isin(liClasses)]
+        print("Using only {} videos from first {} classes".format(len(dfVideos), classes))
+
+    counter = 0
+    # loop through all videos and extract frames
+    for videoPath in dfVideos.videoPath:
+
+        # assemble target diretory
+        videoPath = videoPath.replace('\\' , '/') 
+        li_videoPath = videoPath.split("/")
+        if len(li_videoPath) < 4: raise ValueError("Video path should have min 4 components: {}".format(str(li_videoPath)))
+        sVideoName = li_videoPath[-1].split(".")[0]
+        sTargetDir = frameDir + "/" + li_videoPath[-3] + "/" + li_videoPath[-2] + "/" + sVideoName
         
-        mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
-        hsv[...,0] = ang*180/np.pi/2
-        hsv[...,2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
-        bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-        return_frames.append(bgr)
+        # check if frames already extracted
+        if framesNorm != None and os.path.exists(sTargetDir):
+            nFrames = len(glob.glob(sTargetDir + "/*.*"))
+            if nFrames == framesNorm: 
+                print("Video %5d already extracted to %s" % (counter, sTargetDir))
+                counter += 1
+                continue
+            else: 
+                print("Video %5d: Directory with %d instead of %d frames detected" % (counter, nFrames, framesNorm))
+        
+        # create target directory
+        os.makedirs(sTargetDir, exist_ok = True)
 
-    return np.array(return_frames)
+        # slice videos into frames
+        arFrames = video2frames(videoPath, resizeMinDim)
 
-def background_subtraction(previous_frame, frame_resized_grayscale, min_area):
-    """
-    This function returns 1 for the frames in which the area
-    after subtraction with previous frame is greater than minimum area
-    defined.
-    Thus expensive computation of human detection face detection
-    and face recognition is not done on all the frames.
-    Only the frames undergoing significant amount of change (which is controlled min_area)
-    are processed for detection and recognition.
-    """
-    frameDelta = cv2.absdiff(previous_frame, frame_resized_grayscale)
-    thresh = cv2.threshold(frameDelta, 25, 255, cv2.THRESH_BINARY)[1]
-    thresh = cv2.dilate(thresh, None, iterations=2)
-    _, cnts, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    temp = 0
-    for c in cnts:
-        # if the contour is too small, ignore it
-        if cv2.contourArea(c) > min_area:
-            temp = 1
-    return temp 
+        # get length and fps
+        fVideoSec = video_length(videoPath)
+        nFrames = len(arFrames)
+        fFPS = nFrames / fVideoSec   
 
-def motion_detector(self, img):
-    occupied = False
-    # resize the frame, convert it to grayscale, and blur it
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (15, 15), 0)
-    
-    if self.avg is None:
-        print("[INFO] starting background model...")
-        self.avg = gray.copy().astype("float")
-    
-    # accumulate the weighted average between the current frame and
-    # previous frames, then compute the difference between the current
-    # frame and running average
-    cv2.accumulateWeighted(gray, self.avg, 0.5)
-    frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(self.avg))
-    # threshold the delta image, dilate the thresholded image to fill
-    # in holes, then find contours on thresholded image
-    thresh = cv2.threshold(frameDelta, 5, 255,
-        cv2.THRESH_BINARY)[1]
-    thresh = cv2.dilate(thresh, None, iterations=2)
-    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE)
-    cnts = cnts[1]
-    
-    # loop over the contours
-    for c in cnts:
-        # if the contour is too small, ignore it
-        if cv2.contourArea(c) < 5000:
-            pass
-        occupied = True
-    
-    return occupied 
+        # downsample
+        if framesNorm != None: 
+            arFrames = frames_downsample(arFrames, framesNorm)
 
-def extract_keyframes():
-    video_path = "/Users/anmoluppal/Downloads/SampleVideo_1280x720_1mb.mp4"
-    p_frame_thresh = 300000 # You may need to adjust this threshold
+        # crop images
+        if cropShape != None:
+            arFrames = images_crop(arFrames, *cropShape)
+        
+        # write frames to .jpg files
+        frames2files(arFrames, sTargetDir)         
 
-    cap = cv2.VideoCapture(video_path)
-    # Read the first frame.
-    ret, prev_frame = cap.read()
+        print("Video %5d | %5.1f sec | %d frames | %4.1f fps | saved %s in %s" % (counter, fVideoSec, nFrames, fFPS, str(arFrames.shape), sTargetDir))
+        counter += 1      
 
-    while ret:
-        ret, curr_frame = cap.read()
-
-        if ret:
-            diff = cv2.absdiff(curr_frame, prev_frame)
-            non_zero_count = np.count_nonzero(diff)
-            if non_zero_count > p_frame_thresh:
-                print("Got P-Frame")
-            prev_frame = curr_frame
+    return
