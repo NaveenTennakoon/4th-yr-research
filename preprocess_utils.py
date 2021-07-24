@@ -54,10 +54,10 @@ def video2frames(sVideoPath:str, resizeMinDim:int) -> np.array:
 
         if resizeMinDim != None:
             # resize image
-            arFrameResized = image_resize_aspectratio(arFrame, resizeMinDim)
+            arFrame = image_resize_aspectratio(arFrame, resizeMinDim)
 
 		# Save the resulting frame to list
-        liFrames.append(arFrameResized)
+        liFrames.append(arFrame)
    
     return np.array(liFrames)
 
