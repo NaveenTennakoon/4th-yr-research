@@ -119,11 +119,11 @@ def train_I3D_oflow_end2end(diVideoSet):
 
     # Fit top layers
     print("Fit I3D top layers with generator: %s" % (diTrainTop))
-    optimizer = keras.optimizers.Adam(learning_rate = diTrainTop["fLearn"])
+    optimizer = keras.optimizers.Adam(lr = diTrainTop["fLearn"])
     keI3DOflow.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     count_params(keI3DOflow)    
 
-    keI3DOflow.fit(
+    keI3DOflow.fit_generator(
         genFramesTrain,
         validation_data = genFramesVal,
         epochs = diTrainTop["nEpochs"],
@@ -136,11 +136,110 @@ def train_I3D_oflow_end2end(diVideoSet):
     # Fit entire I3D model
     print("Finetune all I3D layers with generator: %s" % (diTrainAll))
     keI3DOflow = layers_unfreeze(keI3DOflow)
-    optimizer = keras.optimizers.Adam(learning_rate = diTrainAll["fLearn"])
+    optimizer = keras.optimizers.Adam(lr = diTrainAll["fLearn"])
     keI3DOflow.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     count_params(keI3DOflow)    
 
-    keI3DOflow.fit(
+    keI3DOflow.fit_generator(
+        genFramesTrain,
+        validation_data = genFramesVal,
+        epochs = diTrainAll["nEpochs"],
+        workers = 4,                 
+        use_multiprocessing = True,
+        max_queue_size = 8, 
+        verbose = 1,
+        callbacks=[csv_logger, cpAllLast, cpAllBest])
+
+    return
+
+def train_I3D_lipImage_end2end(diVideoSet):
+    """ 
+    * Loads pretrained I3D model, 
+    * reads lip image data generated from training videos,
+    * adjusts top-layers adequately for video data,
+    * trains only news top-layers,
+    * then fine-tunes entire neural network,
+    * saves logs and models to disc.
+    """
+   
+    # directories
+    folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
+    classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    lipsDir        = "data-temp/%s/%s/lips"%(diVideoSet["sName"], folder)
+    modelDir        = "model"
+
+    diTrainTop = {
+        "fLearn" : 1e-3,
+        "nEpochs" : 10}
+
+    diTrainAll = {
+        "fLearn" : 1e-4,
+        "nEpochs" : 15}
+
+    nBatchSize = 1
+
+    print("\nStarting I3D end2end training ...")
+    print(os.getcwd())
+
+    # read the dataset classes
+    oClasses = VideoClasses(classfile)
+
+    # Load training data
+    genFramesTrain = FramesGenerator(lipsDir + "/train", nBatchSize, 
+        diVideoSet["framesNorm"], 112, 112, 3, oClasses.liClasses)
+    genFramesVal = FramesGenerator(lipsDir + "/valid", nBatchSize, 
+        diVideoSet["framesNorm"], 112, 112, 3, oClasses.liClasses)
+
+    # Load pretrained i3d model and adjust top layer 
+    print("Load pretrained I3D flow model ...")
+    keI3DOflow = Inception_Inflated3d(
+        include_top=False,
+        weights='rgb_imagenet_and_kinetics',
+        input_shape=(diVideoSet["framesNorm"], 112, 112, 3))
+    print("Add top layers with %d output classes ..." % oClasses.nClasses)
+    keI3DOflow = layers_freeze(keI3DOflow)
+    keI3DOflow = add_i3d_top(keI3DOflow, oClasses.nClasses, dropout_prob=0.5)
+
+    # Prep logging
+    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + \
+        "-%s%03d-lips-i3d"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    
+    # Helper: Save results
+    csv_logger = keras.callbacks.CSVLogger("log/" + sLog + "-acc.csv", append = True)
+
+    # Helper: Save the model
+    os.makedirs(modelDir, exist_ok=True)
+    cpTopLast = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + "-above-last.h5", verbose = 0)
+    cpTopBest = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + "-above-best.h5",
+        verbose = 1, save_best_only = True)
+    cpAllLast = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + "-entire-last.h5", verbose = 0)
+    cpAllBest = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + "-entire-best.h5",
+        verbose = 1, save_best_only = True)
+
+    # Fit top layers
+    print("Fit I3D top layers with generator: %s" % (diTrainTop))
+    optimizer = keras.optimizers.Adam(lr = diTrainTop["fLearn"])
+    keI3DOflow.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    count_params(keI3DOflow)    
+
+    keI3DOflow.fit_generator(
+        genFramesTrain,
+        validation_data = genFramesVal,
+        epochs = diTrainTop["nEpochs"],
+        workers = 4,                 
+        use_multiprocessing = True,
+        max_queue_size = 8, 
+        verbose = 1,
+        callbacks=[csv_logger, cpTopLast, cpTopBest])
+    
+    # Fit entire I3D model
+    print("Finetune all I3D layers with generator: %s" % (diTrainAll))
+    keI3DOflow = layers_unfreeze(keI3DOflow)
+    optimizer = keras.optimizers.Adam(lr = diTrainAll["fLearn"])
+    keI3DOflow.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    count_params(keI3DOflow)    
+
+    keI3DOflow.fit_generator(
         genFramesTrain,
         validation_data = genFramesVal,
         epochs = diTrainAll["nEpochs"],
@@ -154,8 +253,17 @@ def train_I3D_oflow_end2end(diVideoSet):
     
 if __name__ == '__main__':
 
+    # diVideoSet = {"sName" : "signs",
+    #     "nClasses" : 12,   # number of classes
+    #     "framesNorm" : 40,    # number of frames per video
+    #     "nMinDim" : 240,   # smaller dimension of saved video-frames
+    #     "tuShape" : (720, 1280), # height, width
+    #     "nFpsAvg" : 30,
+    #     "nFramesAvg" : 90, 
+    #     "fDurationAvG" : 3.0} # seconds 
+
     diVideoSet = {"sName" : "signs",
-        "nClasses" : 12,   # number of classes
+        "nClasses" : 5,   # number of classes
         "framesNorm" : 40,    # number of frames per video
         "nMinDim" : 240,   # smaller dimension of saved video-frames
         "tuShape" : (720, 1280), # height, width

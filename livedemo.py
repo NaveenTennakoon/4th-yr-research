@@ -16,6 +16,7 @@ from timer import Timer
 from preprocess_utils import frames_downsample, images_crop
 from videocapture import video_start, frame_show, video_show, video_capture
 from opticalflow import frames2flows
+from lip_extractor import bodyFrames2LipFrames
 from datagenerator import VideoClasses
 from model_i3d import I3D_load
 from predict import probability2label
@@ -23,31 +24,47 @@ from predict import probability2label
 def livedemo():
 	
 	# dataset
+	# diVideoSet = {"sName" : "signs",
+    #     "nClasses" : 12,   # number of classes
+    #     "framesNorm" : 40,    # number of frames per video
+    #     "nMinDim" : 240,   # smaller dimension of saved video-frames
+    #     "tuShape" : (720, 1280), # height, width
+    #     "nFpsAvg" : 30,
+    #     "nFramesAvg" : 90, 
+    #     "fDurationAvg" : 3.0} # seconds
+
 	diVideoSet = {"sName" : "signs",
-        "nClasses" : 12,   # number of classes
+        "nBaseClasses" : 5,   # number of base classes
+		"nLipClasses" : 12, 	# number of classes
         "framesNorm" : 40,    # number of frames per video
         "nMinDim" : 240,   # smaller dimension of saved video-frames
-        "tuShape" : (720, 1280), # height, width
+        "tuShapeBase" : (720, 1280), # height, width
+		"tuLipShape" : (112, 168), # height, width
         "nFpsAvg" : 30,
         "nFramesAvg" : 90, 
-        "fDurationAvG" : 3.0} # seconds
+        "fDurationAvg" : 3.0} # seconds
 
 	# files
-	classFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
+	baseClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nBaseClasses"])
+	lipClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nLipClasses"])
 	
 	print("\nStarting gesture recognition live demo ... ")
 	print(os.getcwd())
 	print(diVideoSet)
 	
-	# load label description
-	classes = VideoClasses(classFile)
+	# load label descriptions
+	baseClasses = VideoClasses(baseClassFile)
+	lipClasses = VideoClasses(lipClassFile)
 
-	sModelFile = "model/20180627-0729-chalearn020-oflow-i3d-entire-best.h5"
+	sFlowModelFile = "model/20210724-0915-signs005-oflow-i3d-above-best.h5"
+	sLipModelFile = "model/20210723-0525-signs012-lips-i3d-entire-best.h5"
 	h, w = 224, 224
-	keI3D = I3D_load(sModelFile, diVideoSet["framesNorm"], (h, w, 2), classes.nClasses)
+	hL, wL = 112, 112
+	keI3Dbase = I3D_load(sFlowModelFile, diVideoSet["framesNorm"], (h, w, 2), baseClasses.nClasses)
+	keI3DLip = I3D_load(sLipModelFile, diVideoSet["framesNorm"], (hL, wL, 3), lipClasses.nClasses)
 
 	# open a pointer to the webcam video stream
-	oStream = video_start(device = 1, tuResolution = (320, 240), nFramePerSecond = 30)
+	oStream = video_start(device = 1, tuResolution = (427, 240), nFramePerSecond = 30)
 
 	#liVideosDebug = glob.glob(sVideoDir + "/train/*/*.*")
 	nCount = 0
@@ -74,8 +91,11 @@ def livedemo():
 			frame_show(oStream, "orange", "Translating sign ...", tuRectangle = (h, w))
 
 			# crop and downsample frames
-			arFrames = images_crop(arFrames, h, w)
 			arFrames = frames_downsample(arFrames, diVideoSet["framesNorm"])
+			
+			lipFrames = bodyFrames2LipFrames(arFrames)
+			arFrames = images_crop(arFrames, h, w)
+			lipFrames = images_crop(lipFrames, hL, wL)
 
 			# Translate frames to flows - these are already scaled between [-1.0, 1.0]
 			print("Calculate optical flow on %d frames ..." % len(arFrames))
@@ -84,10 +104,16 @@ def livedemo():
 			print("Optical flow per frame: %.3f" % (timer.stop() / len(arFrames)))
 
 			# predict video from flows			
-			print("Predict video with %s ..." % (keI3D.name))
+			print("Predict video with %s ..." % (keI3Dbase.name))
 			arX = np.expand_dims(arFlows, axis=0)
-			arProbas = keI3D.predict(arX, verbose = 1)[0]
-			_, sLabel, fProba = probability2label(arProbas, classes, nTop = 3)
+			arProbas = keI3Dbase.predict(arX, verbose = 1)[0]
+			print(arProbas)
+			_, sLabel, fProba = probability2label(arProbas, baseClasses, nTop = 3)
+
+			arX = np.expand_dims(lipFrames, axis=0)
+			arProbas = keI3DLip.predict(arX, verbose = 1)[0]
+			print(arProbas)
+			_, sLabel, fProba = probability2label(arProbas, lipClasses, nTop = 3)
 
 			sResults = "Sign: %s (%.0f%%)" % (sLabel, fProba*100.)
 			print(sResults)
