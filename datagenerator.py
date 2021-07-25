@@ -6,8 +6,7 @@ import glob
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.utils import to_categorical
-from keras.utils.all_utils import Sequence
+from keras.utils import Sequence, to_categorical
 
 from preprocess_utils import files2frames, images_normalize
 
