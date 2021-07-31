@@ -11,6 +11,71 @@ import numpy as np
 import pandas as pd
 import cv2
 
+from skimage.util.shape import view_as_windows
+
+def random_flip_image(arFrame:np.array) -> np.array:
+    flip = np.random.randint(0,2)
+    if flip == 1:
+        arFrame = np.fliplr(arFrame)
+
+    return arFrame
+
+def random_flip_images(arFrames:np.array) -> np.array:
+    liFrames = []
+    for nFrame in range(arFrames.shape[0]):
+        arFrame = random_flip_image(arFrames[nFrame,:,:,:])
+        liFrames.append(arFrame)
+    
+    return np.array(liFrames)
+
+def random_crop_image(arFrame:np.array, height:int, width:int) -> np.array:
+
+    x_range = arFrame.shape[1] - width
+    y_range = arFrame.shape[0] - height
+    x = np.random.randint(0, x_range)
+    y = np.random.randint(0, y_range)
+
+    # Get sliding windows
+    w = view_as_windows(arFrame, (height, width, 1))[...,0]
+    # Index and get our specific windows
+    cropped_image = w[y, x]
+
+    # Reshape to image dimensions
+    cropped_image = cropped_image.transpose(1,2,0)
+
+    return cropped_image
+
+def random_crop_images(arFrames:np.array, targetHeight:int, targetWidth:int) -> np.array:
+    """ randomly crop each frame in array to specified size
+    """
+
+    _, height, width, _ = arFrames.shape
+
+    if (height < targetHeight) or (width < targetWidth):
+        raise ValueError("Image height/width too small to crop to target size")
+    elif height == targetHeight or width == targetWidth:
+        return arFrames
+
+    liFrames = []
+    for nFrame in range(arFrames.shape[0]):
+        arFrame = random_crop_image(arFrames[nFrame,:,:,:], targetHeight, targetWidth)
+        liFrames.append(arFrame)
+
+    return np.array(liFrames)
+
+def image_grayscale(arImage: np.array):
+    image = cv2.cvtColor(arImage[:,:,:], cv2.COLOR_BGR2GRAY)
+
+    return image
+
+def image_binary(arImage: np.array):
+    if len(arImage.shape) == 3:
+        raise ValueError("Image provided is not in grayscale")
+    else:
+        _, image = cv2.threshold(arImage[:,:], 100, 255, cv2.THRESH_BINARY)
+
+    return image
+
 def image_resize_aspectratio(arImage: np.array, minDim:int = 256) -> np.array:
     nHeigth, nWidth, _ = arImage.shape
 
@@ -68,7 +133,10 @@ def frames2files(arFrames:np.array, sTargetDir:str):
 
     os.makedirs(sTargetDir, exist_ok=True)
     for nFrame in range(arFrames.shape[0]):
-        cv2.imwrite(sTargetDir + "/frame%04d.jpg" % nFrame, arFrames[nFrame, :, :, :])
+        if len(arFrames.shape) == 4:
+            cv2.imwrite(sTargetDir + "/frame%04d.jpg" % nFrame, arFrames[nFrame, :, :, :])
+        else:
+            cv2.imwrite(sTargetDir + "/frame%04d.jpg" % nFrame, arFrames[nFrame, :, :])
 
     return
 
@@ -143,7 +211,7 @@ def images_rescale(arFrames:np.array) -> np.array(float):
 
     return ar_fFrames
 
-def images_normalize(arFrames:np.array, targetNum:int, height:int, width:int, rescale:bool = True) -> np.array(float):
+def images_normalize(arFrames:np.array, targetNum:int, height:int, width:int, flip:bool = False, rescale:bool = True) -> np.array(float):
     """ Several image normalizations/preprocessing: 
         - downsample number of frames
         - crop to centered image
@@ -154,7 +222,10 @@ def images_normalize(arFrames:np.array, targetNum:int, height:int, width:int, re
 
     # downsample and crop the image frames
     arFrames = frames_downsample(arFrames, targetNum)
-    arFrames = images_crop(arFrames, height, width)
+    arFrames = random_crop_images(arFrames, height, width)
+
+    if flip:
+        arFrames = random_flip_images(arFrames)
 
     if rescale:
         # normalize to [-1.0, 1.0]

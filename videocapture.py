@@ -6,14 +6,14 @@ import numpy as np
 import cv2
 
 from preprocess_utils import image_crop
-from opticalflow import OpticalFlow, flow2colorimage
+from optical_flow import OpticalFlow, flow2colorimage
 
-def video_start(device = 0, tuResolution =(320, 240), nFramePerSecond = 30):
+def video_start(device = 0, tuResolution =(427, 240), nFramePerSecond = 30):
 	""" Returns videocapture object/stream
 	Parameters:
 		device: 0 for the primary webcam, 1 for attached webcam
 	"""
-	
+
 	# try to open webcam device
 	oStream = cv2.VideoCapture(device) 
 	if not oStream.isOpened():
@@ -36,7 +36,7 @@ def video_start(device = 0, tuResolution =(320, 240), nFramePerSecond = 30):
 
 	return oStream
 
-def rectangle_text(arImage, sColor, sUpper, sLower = None, tuRectangle = (224, 224)):
+def rectangle_text(arImage, sColor, sUpper, sLower = None, tuRectangle = (240, 427)):
 	""" Returns new image (not altering arImage)
 	"""
 
@@ -66,7 +66,7 @@ def rectangle_text(arImage, sColor, sUpper, sLower = None, tuRectangle = (224, 2
 
 	return arImageNew
 
-def video_show(oStream, sColor, sUpper, sLower = None, tuRectangle = (224, 224), nCountdown = 0): 
+def video_show(oStream, sColor, sUpper, sLower = None, tuRectangle = (240, 427), nCountdown = 0): 
 	
 	if nCountdown > 0: 
 		fTimeTarget = time.time() + nCountdown
@@ -96,7 +96,7 @@ def video_show(oStream, sColor, sUpper, sLower = None, tuRectangle = (224, 224),
 		if key != 0xFF: break
 	return key
 
-def video_capture(oStream, sColor, sText, tuRectangle = (224, 224), nTimeDuration = 3, bOpticalFlow = False):
+def video_capture(oStream, sColor, sText, tuRectangle = (240, 427), nTimeDuration = 3, bOpticalFlow = False):
 	
 	if bOpticalFlow:
 		oOpticalFlow = OpticalFlow(bThirdChannel = True)
@@ -108,7 +108,7 @@ def video_capture(oStream, sColor, sText, tuRectangle = (224, 224), nTimeDuratio
 	# loop over frames from the video file stream
 	while True:
 		# grab the frame from the threaded video file stream
-		(bGrabbed, arFrame) = oStream.read()
+		(_, arFrame) = oStream.read()
 		arFrame = cv2.flip(arFrame, 1)
 		liFrames.append(arFrame)
 
@@ -123,7 +123,6 @@ def video_capture(oStream, sColor, sText, tuRectangle = (224, 224), nTimeDuratio
 		if bOpticalFlow:
 			arFlow = oOpticalFlow.next(image_crop(arFrame, *tuRectangle))
 			liFlows.append(arFlow)
-			cv2.imshow("Optical flow", flow2colorimage(arFlow))
 
 		# stop after nTimeDuration sec
 		if fTimeElapsed >= nTimeDuration: break
@@ -135,7 +134,7 @@ def video_capture(oStream, sColor, sText, tuRectangle = (224, 224), nTimeDuratio
 
 	return fTimeElapsed, np.array(liFrames), np.array(liFlows)
 
-def frame_show(oStream, sColor:str, sText:str, tuRectangle = (224, 224)):
+def frame_show(oStream, sColor:str, sText:str, tuRectangle = (240, 427)):
 	""" Read frame from webcam and display it with box+text """
 
 	(_, oFrame) = oStream.read()

@@ -1,15 +1,7 @@
-"""
-This pipeline
-
-* extracts frames/images from videos (training + validation)
-* calculates optical flow
-* trains an I3D neural network
-"""
-
 import os
 
 from preprocess_utils import videosDir2framesDir
-from opticalflow import framesDir2flowsDir
+from optical_flow import framesDir2flowsDir
 from lip_extractor import bodyFramesDir2lipFrameDir
 from train_i3d import train_I3D_oflow_end2end, train_I3D_lipImage_end2end
 
@@ -19,25 +11,14 @@ if __name__ == '__main__':
     bOflow = True
     bLips = False
 
-    # dataset
-    # diVideoSet = {"sName" : "signs",
-    #     "nClasses" : 12,   # number of classes
-    #     "framesNorm" : 40,    # number of frames per video
-    #     "nMinDim" : 240,   # smaller dimension of saved video-frames
-    #     "tuShape" : (720, 1280), # height, width
-    #     "nFpsAvg" : 30,
-    #     "nFramesAvg" : 90, 
-    #     "fDurationAvG" : 3.0} # seconds
-
-    diVideoSet = {"sName" : "signs",
-        "nClasses" : 5,   # number of classes
-        "framesNorm" : 40,    # number of frames per video
-        "nMinDim" : 240,   # smaller dimension of saved video-frames
-        "tuShape" : (720, 1280), # height, width
-        "nFpsAvg" : 30,
-        "nFramesAvg" : 90, 
-        "fDurationAvG" : 3.0} # seconds  
-
+    diVideoSet = {
+        "sName" : "signs",
+        "nClasses" : 12,        # number of classes
+        "framesNorm" : 40,      # number of frames per video
+        "nMinDim" : 240,        # smaller dimension of saved video-frames
+        "tuShape" : (720, 1280),# height, width
+    }
+    
     # directories
     sFolder         = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
     sClassFile      = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
@@ -61,7 +42,8 @@ if __name__ == '__main__':
     if bOflow:
         framesDir2flowsDir(imageDir, oFlowDir, framesNorm = diVideoSet["framesNorm"])
     if bLips:
-        bodyFramesDir2lipFrameDir(imageDir, lipDir, minsize = 40, threshold = [ 0.6, 0.7, 0.7 ], factor = 0.709)
+        bodyFramesDir2lipFrameDir(imageDir, lipDir, minsize = 40, threshold = [ 0.6, 0.7, 0.7 ],
+        factor = 0.709, grayscale=False, binary=False)
 
     # train I3D network(s)
     if bOflow:

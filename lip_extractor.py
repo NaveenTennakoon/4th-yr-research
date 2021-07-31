@@ -1,7 +1,3 @@
-# from __future__ import absolute_import
-# from __future__ import division
-# from __future__ import print_function
-
 import numpy as np
 import warnings
 import tensorflow as tf
@@ -10,9 +6,9 @@ import glob
 import os
 
 from PIL import Image as PImage
-from preprocess_utils import frames2files, image_resize_aspectratio
 
 import detect_face
+from preprocess_utils import frames2files, image_resize_aspectratio, image_grayscale, image_binary
 
 def extract_lip_image(minsize:int, threshold:list, factor:float, path:str, \
     pnet:any, rnet:any, onet:any) -> np.array:
@@ -38,6 +34,8 @@ def extract_lip_image(minsize:int, threshold:list, factor:float, path:str, \
     return np.array(canvas)
 
 def bodyFrames2LipFrames(arFrames:np.array) -> np.array:
+    """ Extract lip image sequence from a given video(numpy array of frames)
+    """
     minsize = 40
     threshold = [ 0.6, 0.7, 0.7 ]
     factor = 0.709
@@ -69,7 +67,7 @@ def bodyFrames2LipFrames(arFrames:np.array) -> np.array:
     return np.array(liFrames)
 
 def bodyFramesDir2lipFrameDir(bodyBaseDir:str, lipBaseDir:str, minsize:int, \
-    threshold:list, factor:float):
+    threshold:list, factor:float, grayscale:bool=False, binary:bool=False):
     """ Extract Lip frames from body rgb frames (extracted from videos) 
     
     Input videoframe structure: ... bodyBaseDir / train / class001 / videoname / body.jpg
@@ -113,6 +111,10 @@ def bodyFramesDir2lipFrameDir(bodyBaseDir:str, lipBaseDir:str, minsize:int, \
             # extract lip frame from body image
             arLipFrame = extract_lip_image(minsize, threshold, factor, frame, pnet, rnet, onet)
             arLipFrame = image_resize_aspectratio(arLipFrame, 112)
+            if grayscale:
+                arLipFrame = image_grayscale(arLipFrame)
+            if binary:
+                arLipFrame = image_binary(arLipFrame)
             liFrames.append(arLipFrame)
 
         frames2files(np.array(liFrames), lipDir)

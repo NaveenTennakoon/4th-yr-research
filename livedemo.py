@@ -3,7 +3,7 @@
 * waits for the start signal from user,
 * captures 5 seconds of video,
 * extracts frames from the video
-* calculates and displays the optical flow,
+* calculates the optical flow,
 * and uses the neural network to predict the sign language gesture.
 * Then start again.
 """
@@ -15,38 +15,25 @@ import cv2
 from timer import Timer
 from preprocess_utils import frames_downsample, images_crop
 from videocapture import video_start, frame_show, video_show, video_capture
-from opticalflow import frames2flows
+from optical_flow import frames2flows
 from lip_extractor import bodyFrames2LipFrames
 from datagenerator import VideoClasses
 from model_i3d import I3D_load
 from predict import probability2label
 
-def livedemo():
-	
-	# dataset
-	# diVideoSet = {"sName" : "signs",
-    #     "nClasses" : 12,   # number of classes
-    #     "framesNorm" : 40,    # number of frames per video
-    #     "nMinDim" : 240,   # smaller dimension of saved video-frames
-    #     "tuShape" : (720, 1280), # height, width
-    #     "nFpsAvg" : 30,
-    #     "nFramesAvg" : 90, 
-    #     "fDurationAvg" : 3.0} # seconds
+def livedemo(fused=False):
 
-	diVideoSet = {"sName" : "signs",
-        "nBaseClasses" : 5,   # number of base classes
-		"nLipClasses" : 12, 	# number of classes
-        "framesNorm" : 40,    # number of frames per video
-        "nMinDim" : 240,   # smaller dimension of saved video-frames
-        "tuShapeBase" : (720, 1280), # height, width
-		"tuLipShape" : (112, 168), # height, width
-        "nFpsAvg" : 30,
-        "nFramesAvg" : 90, 
-        "fDurationAvg" : 3.0} # seconds
+	diVideoSet = {
+		"sName" : "signs",
+        "nBaseClasses" : 5,   		# number of base classes
+		"nExtendedClasses" : 12, 	# number of classes
+        "framesNorm" : 40,    		# number of frames per video
+        "fDurationAvg" : 3.0 		# seconds
+	}
 
-	# files
-	baseClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nBaseClasses"])
-	lipClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nLipClasses"])
+	# class files
+	baseClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nExtendedClasses"])
+	classFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nExtendedClasses"])
 	
 	print("\nStarting gesture recognition live demo ... ")
 	print(os.getcwd())
@@ -54,19 +41,24 @@ def livedemo():
 	
 	# load label descriptions
 	baseClasses = VideoClasses(baseClassFile)
-	lipClasses = VideoClasses(lipClassFile)
+	classes = VideoClasses(classFile)
 
-	sFlowModelFile = "model/20210724-0915-signs005-oflow-i3d-above-best.h5"
-	sLipModelFile = "model/20210723-0525-signs012-lips-i3d-entire-best.h5"
-	h, w = 224, 224
-	hL, wL = 112, 112
-	keI3Dbase = I3D_load(sFlowModelFile, diVideoSet["framesNorm"], (h, w, 2), baseClasses.nClasses)
-	keI3DLip = I3D_load(sLipModelFile, diVideoSet["framesNorm"], (hL, wL, 3), lipClasses.nClasses)
+	h, w = 220, 310
+
+	if fused:
+		sModelFile = "model/12-earlyfuse-tl-rc-full-best.h5"
+		keI3D = I3D_load(sModelFile)
+
+	else:
+		sFlowModelFile = "model/12-oflow-tl-rc-full-best.h5"
+		sLipModelFile = "model/12-lip-tl-full-best.h5"
+	
+		keI3Dbase = I3D_load(sFlowModelFile)
+		keI3DLip = I3D_load(sLipModelFile)
 
 	# open a pointer to the webcam video stream
 	oStream = video_start(device = 1, tuResolution = (427, 240), nFramePerSecond = 30)
 
-	#liVideosDebug = glob.glob(sVideoDir + "/train/*/*.*")
 	nCount = 0
 	sResults = ""
 	timer = Timer()
@@ -90,33 +82,43 @@ def livedemo():
 			# show orange wait box
 			frame_show(oStream, "orange", "Translating sign ...", tuRectangle = (h, w))
 
-			# crop and downsample frames
+			# Downsample frames, extract lip frames and crop images
 			arFrames = frames_downsample(arFrames, diVideoSet["framesNorm"])
-			
 			lipFrames = bodyFrames2LipFrames(arFrames)
 			arFrames = images_crop(arFrames, h, w)
-			lipFrames = images_crop(lipFrames, hL, wL)
-
+			
 			# Translate frames to flows - these are already scaled between [-1.0, 1.0]
 			print("Calculate optical flow on %d frames ..." % len(arFrames))
 			timer.start()
 			arFlows = frames2flows(arFrames, bThirdChannel = False, bShow = True)
 			print("Optical flow per frame: %.3f" % (timer.stop() / len(arFrames)))
 
-			# predict video from flows			
-			print("Predict video with %s ..." % (keI3Dbase.name))
-			arX = np.expand_dims(arFlows, axis=0)
-			arProbas = keI3Dbase.predict(arX, verbose = 1)[0]
-			print(arProbas)
-			_, sLabel, fProba = probability2label(arProbas, baseClasses, nTop = 3)
+			if fused:
+				# predict video from fused model			
+				print("Predict video with %s ..." % (keI3D.name))
+				arXBody = np.expand_dims(arFlows, axis=0)
+				arXLip = np.expand_dims(lipFrames, axis=0)
+				arProbas = keI3D.predict([arXBody, arXLip], verbose = 1)[0]
+				_, sLabel, fProba = probability2label(arProbas, classes, nTop = 3)
+				sResults = "Sign with Fusion: %s (%.0f%%)" % (sLabel, fProba*100.)
+				
+				print(sResults)
+			else:
+				# predict video from flows			
+				print("Predict video with %s ..." % (keI3Dbase.name))
+				arXBase = np.expand_dims(arFlows, axis=0)
+				arProbasBase = keI3Dbase.predict(arXBase, verbose = 1)[0]
+				_, sLabelBase, fProbaBase = probability2label(arProbasBase, baseClasses, nTop = 3)
+				sResultsBase = "Sign with Flow images: %s (%.0f%%)" % (sLabelBase, fProbaBase*100.)
 
-			arX = np.expand_dims(lipFrames, axis=0)
-			arProbas = keI3DLip.predict(arX, verbose = 1)[0]
-			print(arProbas)
-			_, sLabel, fProba = probability2label(arProbas, lipClasses, nTop = 3)
+				# predict video from lip images		
+				print("Predict video with %s ..." % (keI3DLip.name))	
+				arXLip = np.expand_dims(lipFrames, axis=0)
+				arProbasLip = keI3DLip.predict(arXLip, verbose = 1)[0]
+				_, sLabelLip, fProbaLip = probability2label(arProbasLip, classes, nTop = 3)
+				sResultsLip = "Sign with Lip images: %s (%.0f%%)" % (sLabelLip, fProbaLip*100.)
 
-			sResults = "Sign: %s (%.0f%%)" % (sLabel, fProba*100.)
-			print(sResults)
+				print(sResultsBase, sResultsLip)
 			nCount += 1
 
 		# quit
@@ -130,4 +132,7 @@ def livedemo():
 	return
 
 if __name__ == '__main__':
-	livedemo()
+
+	fused = True
+
+	livedemo(fused)
