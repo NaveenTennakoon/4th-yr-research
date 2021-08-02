@@ -13,7 +13,7 @@ import numpy as np
 import cv2
 
 from timer import Timer
-from preprocess_utils import frames_downsample, images_crop
+from preprocess_utils import frames_downsample, images_crop, video2frames
 from videocapture import video_start, frame_show, video_show, video_capture
 from optical_flow import frames2flows
 from lip_extractor import bodyFrames2LipFrames
@@ -21,18 +21,10 @@ from datagenerator import VideoClasses
 from model_i3d import I3D_load
 from predict import probability2label
 
-def livedemo(fused=False):
-
-	diVideoSet = {
-		"sName" : "signs",
-        "nBaseClasses" : 5,   		# number of base classes
-		"nExtendedClasses" : 12, 	# number of classes
-        "framesNorm" : 40,    		# number of frames per video
-        "fDurationAvg" : 3.0 		# seconds
-	}
+def livedemo(diVideoSet, fused=False):
 
 	# class files
-	baseClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nExtendedClasses"])
+	baseClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nBaseClasses"])
 	classFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nExtendedClasses"])
 	
 	print("\nStarting gesture recognition live demo ... ")
@@ -131,8 +123,84 @@ def livedemo(fused=False):
 
 	return
 
+def predictForVideo(diVideoSet, fused:bool=False):
+	# class files
+	baseClassFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nBaseClasses"])
+	classFile = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nExtendedClasses"])
+	
+	print("\nStarting gesture recognition live demo ... ")
+	print(os.getcwd())
+	print(diVideoSet)
+
+	# load label descriptions
+	baseClasses = VideoClasses(baseClassFile)
+	classes = VideoClasses(classFile)
+
+	h, w = 220, 310
+	videoPath = "data-set/%s/%03d/valid/c007/robe_10.mp4"%(diVideoSet["sName"], diVideoSet["nExtendedClasses"])
+
+	if fused:
+		sModelFile = "model/12-fused-tl-rc-full-best.h5"
+		keI3D = I3D_load(sModelFile)
+
+	else:
+		sFlowModelFile = "model/12-oflow-tl-rc-full-best.h5"
+		sLipModelFile = "model/12-lip-random-full-best.h5"
+	
+		keI3Dbase = I3D_load(sFlowModelFile)
+		keI3DLip = I3D_load(sLipModelFile)
+
+	arFrames = video2frames(videoPath, diVideoSet["nMinDim"])
+	arFrames = frames_downsample(arFrames, diVideoSet["framesNorm"])
+	lipFrames = bodyFrames2LipFrames(arFrames)
+	arFrames = images_crop(arFrames, h, w)
+
+	print("Calculate optical flow on %d frames ..." % len(arFrames))
+	arFlows = frames2flows(arFrames, bThirdChannel = False, bShow = False)
+
+	if fused:
+		# predict video from fused model			
+		print("Predict video with %s ..." % (keI3D.name))
+		arXBody = np.expand_dims(arFlows, axis=0)
+		arXLip = np.expand_dims(lipFrames, axis=0)
+		arProbas = keI3D.predict([arXBody, arXLip], verbose = 1)[0]
+		print(arProbas)
+		_, sLabel, fProba = probability2label(arProbas, classes, nTop = 3)
+		sResults = "Sign with Fusion: %s (%.0f%%)" % (sLabel, fProba*100.)
+		
+		print(sResults)
+	else:
+		# predict video from flows			
+		print("Predict video with %s ..." % (keI3Dbase.name))
+		arXBase = np.expand_dims(arFlows, axis=0)
+		arProbasBase = keI3Dbase.predict(arXBase, verbose = 1)[0]
+		_, sLabelBase, fProbaBase = probability2label(arProbasBase, classes, nTop = 3)
+		sResultsBase = "Sign with Flow images: %s (%.0f%%)" % (sLabelBase, fProbaBase*100.)
+
+		# predict video from lip images		
+		print("Predict video with %s ..." % (keI3DLip.name))	
+		arXLip = np.expand_dims(lipFrames, axis=0)
+		arProbasLip = keI3DLip.predict(arXLip, verbose = 1)[0]
+		_, sLabelLip, fProbaLip = probability2label(arProbasLip, classes, nTop = 3)
+		sResultsLip = "Sign with Lip images: %s (%.0f%%)" % (sLabelLip, fProbaLip*100.)
+
+		print(sResultsBase, sResultsLip)
+
 if __name__ == '__main__':
 
-	fused = True
+	fused = False
+	fromVideo = True
 
-	livedemo(fused)
+	diVideoSet = {
+		"sName" : "signs",
+        "nBaseClasses" : 5,   		# number of base classes
+		"nExtendedClasses" : 12, 	# number of classes
+        "framesNorm" : 40,    		# number of frames per video
+		"nMinDim" : 240,        	# smaller dimension of extracted video-frames
+        "fDurationAvg" : 3.0 		# seconds
+	}
+
+	if fromVideo:
+		predictForVideo(diVideoSet, fused)
+	else:
+		livedemo(diVideoSet, fused)

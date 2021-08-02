@@ -9,4 +9,4 @@ model
 models
 videos
 
-test.*
+test*
