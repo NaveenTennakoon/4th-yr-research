@@ -12,7 +12,6 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import warnings
-
 import os
 
 from keras.models import Model, load_model
@@ -27,7 +26,8 @@ from keras.layers import AveragePooling3D
 from keras.layers import Dropout
 from keras.layers import Reshape
 from keras.layers import Lambda
-from keras.layers import add
+from keras.layers import Dense
+from keras.layers import concatenate
 
 from keras.utils import layer_utils
 from keras.utils.data_utils import get_file
@@ -631,13 +631,13 @@ def late_fused_model(flow_model:Model, lip_model:Model):
 
     output_1 = flow_model.output
     output_2 = lip_model.output
-    added = add([output_1, output_2])
+    concat = concatenate([output_1, output_2])
 
     # final softmax
-    x = Activation('softmax', name='prediction')(added)
+    out = Dense(12, activation='softmax', name='prediction')(concat)
 
     #create graph of new model
-    model = Model(inputs=(input_1, input_2), outputs=x, name='fused_i3d_inception')
+    model = Model(inputs=(input_1, input_2), outputs=out, name='fused_i3d_inception')
 
     return model
 

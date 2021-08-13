@@ -58,8 +58,8 @@ def train_i3d_oflow_lip_late_fusion(diVideoSet):
     cpAllBest = keras.callbacks.ModelCheckpoint(filepath = sModelDir + "/" + sLog + "-entire-best.h5",
         verbose = 1, save_best_only = True)
     
-    # Fit entire I3D model
-    print("Finetune all I3D layers with generator: %s" % (diTrainAll))
+    # Fit entire model
+    print("Finetune all layers with generator: %s" % (diTrainAll))
     model = layers_unfreeze(model)
     optimizer = keras.optimizers.Adam(lr = diTrainAll["fLearn"])
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
