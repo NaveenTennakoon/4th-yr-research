@@ -36,9 +36,9 @@ def train_i3d_oflow_lip_late_fusion(diVideoSet):
 
     # Load training data
     genFramesTrain = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
-        diVideoSet["framesNorm"], 220, 310, 112, 168, 2, 3, oClasses.liClasses)
+        diVideoSet["framesNorm"], 224, 320, 128, 160, 2, 3, oClasses.liClasses)
     genFramesVal = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
-        diVideoSet["framesNorm"], 220, 310, 112, 168, 2, 3, oClasses.liClasses)
+        diVideoSet["framesNorm"], 224, 320, 124, 160, 2, 3, oClasses.liClasses)
 
     # Load pretrained i3d models 
     print("Load pretrained I3D flow model ...")
@@ -107,9 +107,9 @@ def train_i3d_oflow_lip_early_fusion(diVideoSet):
 
     # Load training data
     genFramesTrain = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
-        diVideoSet["framesNorm"], 220, 310, 112, 168, 2, 3, oClasses.liClasses)
+        diVideoSet["framesNorm"], 224, 320, 128, 160, 2, 3, oClasses.liClasses)
     genFramesVal = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
-        diVideoSet["framesNorm"], 220, 310, 112, 168, 2, 3, oClasses.liClasses)
+        diVideoSet["framesNorm"], 224, 320, 128, 160, 2, 3, oClasses.liClasses)
 
     # Load pretrained i3d models 
     print("Load pretrained I3D flow model ...")
