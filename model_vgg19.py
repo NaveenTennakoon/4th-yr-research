@@ -7,9 +7,9 @@ from train_utils import layers_freeze
 
 # Load pretrained vgg19 model and remove top layer 
 if K.image_data_format() == 'channels_first':
-    input_shape = (3, 112, 168)
+    input_shape = (3, 128, 160)
 else:
-    input_shape = (112, 168, 3)
+    input_shape = (128, 160, 3)
 vgg = VGG19(include_top=False, weights='imagenet', input_shape=input_shape)
 
 input = vgg.input

@@ -4,11 +4,12 @@ import tensorflow as tf
 import menpo.io as mio
 import glob
 import os
+import cv2
 
 from PIL import Image as PImage
 
 import detect_face
-from preprocess_utils import frames2files, image_resize_aspectratio, image_grayscale, image_binary
+from preprocess_utils import frames2files, image_grayscale, image_binary
 
 def extract_lip_image(minsize:int, threshold:list, factor:float, path:str, \
     pnet:any, rnet:any, onet:any) -> np.array:
@@ -26,9 +27,10 @@ def extract_lip_image(minsize:int, threshold:list, factor:float, path:str, \
             center = (int(points[3, 0]) + distances[0], int(points[8, 0]) + distances[1])
         else:
             center = (int(points[3, 0]) + distances[0], int(points[9, 0]) + distances[1])
-        top_left = (center[0] - 12, center[1] - 8)
-        bottom_right = (center[0] + 12, center[1] + 8)
+        top_left = (center[0] - 10, center[1] - 8)
+        bottom_right = (center[0] + 10, center[1] + 8)
         canvas = canvas[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
+        canvas = cv2.resize(canvas, dsize = (0,0), fx = 8, fy = 8, interpolation=cv2.INTER_LINEAR)
     else: warnings.warn("Too many points obtained for input image")
     
     return np.array(canvas)
@@ -57,10 +59,10 @@ def bodyFrames2LipFrames(arFrames:np.array) -> np.array:
                 center = (int(points[3, 0]) + distances[0], int(points[8, 0]) + distances[1])
             else:
                 center = (int(points[3, 0]) + distances[0], int(points[9, 0]) + distances[1])
-            top_left = (center[0] - 12, center[1] - 8)
-            bottom_right = (center[0] + 12, center[1] + 8)
+            top_left = (center[0] - 10, center[1] - 8)
+            bottom_right = (center[0] + 10, center[1] + 8)
             frame = arFrames[nFrame, top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
-            frame = image_resize_aspectratio(frame, 112)
+            frame = cv2.resize(frame, dsize = (0,0), fx = 8, fy = 8, interpolation=cv2.INTER_LINEAR)
             liFrames.append(frame)
         else: warnings.warn("Too many points obtained for input image")
     
@@ -110,7 +112,6 @@ def bodyFramesDir2lipFrameDir(bodyBaseDir:str, lipBaseDir:str, minsize:int, \
         for frame in liFiles:
             # extract lip frame from body image
             arLipFrame = extract_lip_image(minsize, threshold, factor, frame, pnet, rnet, onet)
-            arLipFrame = image_resize_aspectratio(arLipFrame, 112)
             if grayscale:
                 arLipFrame = image_grayscale(arLipFrame)
             if binary:

@@ -40,16 +40,16 @@ def train_I3D_oflow_end2end(diVideoSet):
 
     # Load training data
     genFramesTrain = FramesGenerator(oFlowDir + "/train", nBatchSize, 
-        diVideoSet["framesNorm"], 220, 310, 2, oClasses.liClasses)
+        diVideoSet["framesNorm"], 224, 320, 2, oClasses.liClasses)
     genFramesVal = FramesGenerator(oFlowDir + "/valid", nBatchSize, 
-        diVideoSet["framesNorm"], 220, 310, 2, oClasses.liClasses)
+        diVideoSet["framesNorm"], 224, 320, 2, oClasses.liClasses)
 
     # Load pretrained i3d model and adjust top layer 
     print("Load pretrained I3D flow model ...")
     keI3DOflow = Inception_Inflated3d(
         include_top=False,
         weights='flow_imagenet_and_kinetics',
-        input_shape=(diVideoSet["framesNorm"], 220, 310, 2))
+        input_shape=(diVideoSet["framesNorm"], 224, 320, 2))
     print("Add top layers with %d output classes ..." % oClasses.nClasses)
     keI3DOflow = layers_freeze(keI3DOflow)
     keI3DOflow = add_i3d_top(keI3DOflow, oClasses.nClasses, dropout_prob=0.5)
@@ -137,16 +137,16 @@ def train_I3D_lipImage_end2end(diVideoSet):
 
     # Load training data
     genFramesTrain = FramesGenerator(lipsDir + "/train", nBatchSize, 
-        diVideoSet["framesNorm"], 112, 168, 1, oClasses.liClasses)
+        diVideoSet["framesNorm"], 128, 160, 1, oClasses.liClasses)
     genFramesVal = FramesGenerator(lipsDir + "/valid", nBatchSize, 
-        diVideoSet["framesNorm"], 112, 168, 1, oClasses.liClasses)
+        diVideoSet["framesNorm"], 128, 160, 1, oClasses.liClasses)
 
     # Load pretrained i3d model and adjust top layer 
     print("Load pretrained I3D flow model ...")
     keI3DOflow = Inception_Inflated3d(
         include_top=False,
         weights=None,
-        input_shape=(diVideoSet["framesNorm"], 112, 168, 1),
+        input_shape=(diVideoSet["framesNorm"], 128, 160, 1),
         name="lip_")
     print("Add top layers with %d output classes ..." % oClasses.nClasses)
     keI3DOflow = layers_freeze(keI3DOflow)

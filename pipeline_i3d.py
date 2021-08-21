@@ -8,8 +8,8 @@ from train_i3d import train_I3D_oflow_end2end, train_I3D_lipImage_end2end
 if __name__ == '__main__':
     # Image and/or Optical flow pipeline
     bImage = False
-    bOflow = True
-    bLips = False
+    bOflow = False
+    bLips = True
 
     diVideoSet = {
         "sName" : "signs",

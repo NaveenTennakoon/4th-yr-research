@@ -9,8 +9,8 @@ if __name__ == '__main__':
         "sName" : "signs",
         "nClasses" : 12,        # number of classes
         "framesNorm" : 40,      # number of frames per video
-        "nMinDim" : 112,        # smaller dimension of saved video-frames
-        "tuShape" : (112, 168), # height, width
+        "nMinDim" : 128,        # smaller dimension of saved video-frames
+        "tuShape" : (128, 160), # height, width
     }
     
     # directories
