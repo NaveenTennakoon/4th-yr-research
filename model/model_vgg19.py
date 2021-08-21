@@ -21,4 +21,4 @@ fc = Dense(units=4096, activation='relu', name='fc')(flatten)
 vggmodel = Model(input, fc, name='vgg19-mod')
 vggmodel = layers_freeze(vggmodel)
 
-vggmodel.save('./models/vgg19-mod.h5')
+vggmodel.save('../models/vgg19-mod.h5')

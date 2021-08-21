@@ -3,7 +3,7 @@ import time
 import keras
 
 from datagenerator import VideoClasses, FramesGenerator
-from model_i3d import Inception_Inflated3d, add_i3d_top
+from model.model_i3d import Inception_Inflated3d, add_i3d_top
 from train_utils import layers_freeze, layers_unfreeze, count_params
 
 def train_I3D_oflow_end2end(diVideoSet):
@@ -20,7 +20,7 @@ def train_I3D_oflow_end2end(diVideoSet):
     folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
     classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
     oFlowDir        = "data-temp/%s/%s/oflow"%(diVideoSet["sName"], folder)
-    modelDir        = "model"
+    modelDir        = "saved_models"
 
     diTrainTop = {
         "fLearn" : 1e-3,
@@ -116,8 +116,8 @@ def train_I3D_lipImage_end2end(diVideoSet):
     # directories
     folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
     classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    lipsDir        = "data-temp/%s/%s/binary-lips"%(diVideoSet["sName"], folder)
-    modelDir        = "model"
+    lipsDir        = "data-temp/%s/%s/bin-lips"%(diVideoSet["sName"], folder)
+    modelDir        = "saved_models"
 
     diTrainTop = {
         "fLearn" : 1e-3,

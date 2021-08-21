@@ -2,7 +2,7 @@ import os
 import keras
 import time
 
-from model_att_lstm import Att_LSTM
+from model.model_att_lstm import Att_LSTM
 from datagenerator import VideoClasses, FeaturesGenerator
 from train_utils import count_params
 
@@ -20,7 +20,7 @@ def train_lipImage_end2end(diVideoSet):
     folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
     classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
     lipFeatureDir   = "data-temp/%s/%s/lip-features"%(diVideoSet["sName"], folder)
-    modelDir        = "model"
+    modelDir        = "saved_models"
 
     diTrain = {
         "fLearn" : 1e-4,

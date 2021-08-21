@@ -3,7 +3,7 @@ import time
 import keras
 
 from datagenerator import VideoClasses, MultipleInputGenerator
-from model_i3d import late_fused_model, early_fused_model
+from model.model_i3d import late_fused_model, early_fused_model
 from train_i3d import layers_unfreeze, count_params
 
 def train_i3d_oflow_lip_late_fusion(diVideoSet):

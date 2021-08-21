@@ -18,7 +18,7 @@ from videocapture import video_start, frame_show, video_show, video_capture
 from optical_flow import frames2flows
 from lip_extractor import bodyFrames2LipFrames
 from datagenerator import VideoClasses
-from model_i3d import I3D_load
+from model.model_i3d import I3D_load
 from predict import probability2label
 
 def livedemo(diVideoSet, fused=False):
