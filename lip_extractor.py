@@ -30,6 +30,7 @@ def extract_lip_image(minsize:int, threshold:list, factor:float, path:str, \
         top_left = (center[0] - 10, center[1] - 8)
         bottom_right = (center[0] + 10, center[1] + 8)
         canvas = canvas[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
+        canvas = cv2.cvtColor(canvas, 3)
         canvas = cv2.resize(canvas, dsize = (0,0), fx = 8, fy = 8, interpolation=cv2.INTER_LINEAR)
     else: warnings.warn("Too many points obtained for input image")
     
