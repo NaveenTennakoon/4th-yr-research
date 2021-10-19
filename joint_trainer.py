@@ -15,10 +15,9 @@ def train_i3d_oflow_lip_late_fusion(diVideoSet):
     """
    
     # directories
-    sFolder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
-    sClassFile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    sOflowDir        = "data-temp/%s/%s/oflow"%(diVideoSet["sName"], sFolder)
-    sLipDir          = "data-temp/%s/%s/lips"%(diVideoSet["sName"], sFolder)
+    sClassFile      = "data/slsl-22/annotations/gloss_class.csv"    
+    sOflowDir       = "data/slsl-22/islsl-22/oflow"
+    sLipDir         = "data/slsl-22/islsl-22/lips"
     
     sModelDir        = "model"
 
@@ -37,7 +36,7 @@ def train_i3d_oflow_lip_late_fusion(diVideoSet):
     # Load training data
     genFramesTrain = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
         diVideoSet["framesNorm"], 224, 320, 128, 160, 2, 3, oClasses.liClasses)
-    genFramesVal = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
+    genFramesVal = MultipleInputGenerator(sOflowDir + "/test", sLipDir + "/test", nBatchSize, 
         diVideoSet["framesNorm"], 224, 320, 124, 160, 2, 3, oClasses.liClasses)
 
     # Load pretrained i3d models 
@@ -48,8 +47,7 @@ def train_i3d_oflow_lip_late_fusion(diVideoSet):
     model = late_fused_model(keI3DOflow, keI3DLip)
         
     # Prep logging
-    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + \
-        "-%s%03d-fused-i3d"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + "-fused-i3d"
     
     # Helper: Save results
     csv_logger = keras.callbacks.CSVLogger("log/" + sLog + "-acc.csv", append = True)
@@ -86,10 +84,9 @@ def train_i3d_oflow_lip_early_fusion(diVideoSet):
     """
    
     # directories
-    sFolder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
-    sClassFile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    sOflowDir        = "data-temp/%s/%s/oflow"%(diVideoSet["sName"], sFolder)
-    sLipDir          = "data-temp/%s/%s/lips"%(diVideoSet["sName"], sFolder)
+    sClassFile      = "data/slsl-22/annotations/gloss_class.csv"    
+    sOflowDir       = "data/slsl-22/islsl-22/oflow"
+    sLipDir         = "data/slsl-22/islsl-22/lips"
     
     sModelDir        = "model"
 
@@ -108,7 +105,7 @@ def train_i3d_oflow_lip_early_fusion(diVideoSet):
     # Load training data
     genFramesTrain = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
         diVideoSet["framesNorm"], 224, 320, 128, 160, 2, 3, oClasses.liClasses)
-    genFramesVal = MultipleInputGenerator(sOflowDir + "/train", sLipDir + "/train", nBatchSize, 
+    genFramesVal = MultipleInputGenerator(sOflowDir + "/test", sLipDir + "/test", nBatchSize, 
         diVideoSet["framesNorm"], 224, 320, 128, 160, 2, 3, oClasses.liClasses)
 
     # Load pretrained i3d models 
@@ -119,8 +116,7 @@ def train_i3d_oflow_lip_early_fusion(diVideoSet):
     model = early_fused_model(keI3DOflow, keI3DLip)
         
     # Prep logging
-    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + \
-        "-%s%03d-early-fused-i3d"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + "-early-fused-i3d"
     
     # Helper: Save results
     csv_logger = keras.callbacks.CSVLogger("log/" + sLog + "-acc.csv", append = True)
@@ -158,7 +154,6 @@ if __name__ == '__main__':
         "nClasses" : 12,        # number of classes
         "framesNorm" : 40,      # number of frames per video
         "nMinDim" : 240,        # smaller dimension of saved video-frames
-        "tuShape" : (720, 1280),# height, width
     }
     
     if late_fusion:

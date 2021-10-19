@@ -17,18 +17,17 @@ def train_I3D_oflow_end2end(diVideoSet):
     """
    
     # directories
-    folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
-    classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    oFlowDir        = "data-temp/%s/%s/oflow"%(diVideoSet["sName"], folder)
-    modelDir        = "saved_models"
+    classfile   = "data/slsl-22/annotations/gloss_class.csv"    
+    oFlowDir    = "data/slsl-22/islsl-22/oflow"
+    modelDir    = "saved_models"
 
     diTrainTop = {
         "fLearn" : 1e-3,
-        "nEpochs" : 10}
+        "nEpochs" : 20}
 
     diTrainAll = {
         "fLearn" : 1e-4,
-        "nEpochs" : 15}
+        "nEpochs" : 50}
 
     nBatchSize = 1
 
@@ -41,7 +40,7 @@ def train_I3D_oflow_end2end(diVideoSet):
     # Load training data
     genFramesTrain = FramesGenerator(oFlowDir + "/train", nBatchSize, 
         diVideoSet["framesNorm"], 224, 320, 2, oClasses.liClasses)
-    genFramesVal = FramesGenerator(oFlowDir + "/valid", nBatchSize, 
+    genFramesVal = FramesGenerator(oFlowDir + "/test", nBatchSize, 
         diVideoSet["framesNorm"], 224, 320, 2, oClasses.liClasses)
 
     # Load pretrained i3d model and adjust top layer 
@@ -55,8 +54,7 @@ def train_I3D_oflow_end2end(diVideoSet):
     keI3DOflow = add_i3d_top(keI3DOflow, oClasses.nClasses, dropout_prob=0.5)
 
     # Prep logging
-    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + \
-        "-%s%03d-oflow-i3d"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + "-oflow-i3d"
     
     # Helper: Save results
     csv_logger = keras.callbacks.CSVLogger("log/" + sLog + "-acc.csv", append = True)
@@ -114,10 +112,9 @@ def train_I3D_lipImage_end2end(diVideoSet):
     """
    
     # directories
-    folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
-    classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    lipsDir        = "data-temp/%s/%s/bin-lips"%(diVideoSet["sName"], folder)
-    modelDir        = "saved_models"
+    classfile   = "data/slsl-22/annotations/gloss_class.csv"    
+    lipsDir    = "data/slsl-22/islsl-22/bin-lips"
+    modelDir    = "saved_models"
 
     diTrainTop = {
         "fLearn" : 1e-3,
@@ -138,7 +135,7 @@ def train_I3D_lipImage_end2end(diVideoSet):
     # Load training data
     genFramesTrain = FramesGenerator(lipsDir + "/train", nBatchSize, 
         diVideoSet["framesNorm"], 128, 160, 1, oClasses.liClasses)
-    genFramesVal = FramesGenerator(lipsDir + "/valid", nBatchSize, 
+    genFramesVal = FramesGenerator(lipsDir + "/test", nBatchSize, 
         diVideoSet["framesNorm"], 128, 160, 1, oClasses.liClasses)
 
     # Load pretrained i3d model and adjust top layer 
@@ -153,8 +150,7 @@ def train_I3D_lipImage_end2end(diVideoSet):
     keI3DOflow = add_i3d_top(keI3DOflow, oClasses.nClasses, dropout_prob=0.5, name="lip_")
 
     # Prep logging
-    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + \
-        "-%s%03d-lips-i3d"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + "-lips-i3d"
     
     # Helper: Save results
     csv_logger = keras.callbacks.CSVLogger("log/" + sLog + "-acc.csv", append = True)

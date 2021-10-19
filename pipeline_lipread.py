@@ -6,23 +6,22 @@ from extract_features import features_extract_vgg
 if __name__ == '__main__':
 
     diVideoSet = {
-        "sName" : "signs",
-        "nClasses" : 12,        # number of classes
-        "framesNorm" : 40,      # number of frames per video
-        "nMinDim" : 128,        # smaller dimension of saved video-frames
-        "tuShape" : (128, 160), # height, width
+        "sName" : "slsl-22",
+        "nClasses" : 12,       # number of classes
+        "framesNorm" : 40,     # number of frames per video
+        "nMinDim" : 96,        # smaller dimension of saved video-frames
+        "tuShape" : (96, 128), # height, width
     }
-    
+
     # directories
-    sFolder         = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
-    sClassFile      = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    lipDir          = "data-temp/%s/%s/lips"%(diVideoSet["sName"], sFolder)
-    lipFeatureDir   = "data-temp/%s/%s/lip-features"%(diVideoSet["sName"], sFolder)
+    sClassFile      = "data/slsl-22/annotations/gloss_class.csv"    
+    lipDir          = "data/slsl-22/islsl-22/lips"
+    lipFeatureDir = "data/slsl-22/islsl-22/lip-features"
 
     print("Starting pipeline ...")
     print(os.getcwd())
 
     features_extract_vgg(lipDir+'/train', lipFeatureDir+'/train')
-    features_extract_vgg(lipDir+'/valid', lipFeatureDir+'/valid')
+    features_extract_vgg(lipDir+'/test', lipFeatureDir+'/test')
 
     train_lipImage_end2end(diVideoSet)

@@ -17,16 +17,16 @@ def train_lipImage_end2end(diVideoSet):
     """
    
     # directories
-    folder          = "%03d-%d"%(diVideoSet["nClasses"], diVideoSet["framesNorm"])
-    classfile       = "data-set/%s/%03d/class.csv"%(diVideoSet["sName"], diVideoSet["nClasses"])
-    lipFeatureDir   = "data-temp/%s/%s/lip-features"%(diVideoSet["sName"], folder)
+    # directories
+    classfile      = "data/slsl-22/annotations/gloss_class.csv"    
+    lipFeatureDir = "data/slsl-22/islsl-22/lip-features"
     modelDir        = "saved_models"
 
     diTrain = {
         "fLearn" : 1e-4,
-        "nEpochs" : 50}
+        "nEpochs" : 200}
 
-    nBatchSize = 10
+    nBatchSize = 2
 
     print("\nStarting Attention-LSTM end2end training ...")
     print(os.getcwd())
@@ -36,21 +36,21 @@ def train_lipImage_end2end(diVideoSet):
 
     # Load training data
     genFeaturesTrain = FeaturesGenerator(lipFeatureDir + "/train", nBatchSize, 
-        (diVideoSet["framesNorm"], 4096), oClasses.liClasses)
-    genFeaturesVal = FeaturesGenerator(lipFeatureDir + "/valid", nBatchSize, 
-        (diVideoSet["framesNorm"], 4096), oClasses.liClasses)
+        (diVideoSet["framesNorm"], 2048), oClasses.liClasses)
+    genFeaturesVal = FeaturesGenerator(lipFeatureDir + "/test", nBatchSize, 
+        (diVideoSet["framesNorm"], 2048), oClasses.liClasses)
 
     # Prep logging
-    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + \
-        "-%s%03d-lips-i3d"%(diVideoSet["sName"], diVideoSet["nClasses"])
+    sLog = time.strftime("%Y%m%d-%H%M", time.gmtime()) + "-2-dep"
     
     # Helper: Save results
     csv_logger = keras.callbacks.CSVLogger("log/" + sLog + "-acc.csv", append = True)
 
     # Helper: Save the model
     os.makedirs(modelDir, exist_ok=True)
-    cpAllBest = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + "-entire-best.h5",
-        verbose = 1, save_best_only = True)
+    cpAllBest = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + ".h5", 
+        save_best_only = True)
+    cpAllLast = keras.callbacks.ModelCheckpoint(filepath = modelDir + "/" + sLog + "-last.h5")
         
     model = Att_LSTM()
     
@@ -68,6 +68,6 @@ def train_lipImage_end2end(diVideoSet):
         use_multiprocessing = True,
         max_queue_size = 8, 
         verbose = 1,
-        callbacks=[csv_logger, cpAllBest])
+        callbacks=[csv_logger, cpAllLast, cpAllBest])
 
     return
