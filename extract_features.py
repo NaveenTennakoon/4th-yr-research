@@ -7,7 +7,7 @@ from datagenerator import FramesGenerator
 
 def features_extract_vgg(sFrameBaseDir:str, sFeatureBaseDir:str, nFramesNorm:int = 40):
 
-    vggmodel = load_model('./models/vgg19-mod.h5')
+    vggmodel = load_model('./models/vgg19-flt-64-64.h5')
 
     # prepare frame generator - without shuffling!
     _, h, w, c = vggmodel.input_shape
