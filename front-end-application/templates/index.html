@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Streaming Video Recorder</title>
+</head>
+<body class="text-center">
+  <h1>Sign Language Translator</h1>
+  <div id="recorder">
+    <button id="predict">Predict</button>
+    <button id="stop">Stop</button>
+    <!-- <a id="download"></a> -->
+    <script type="text/javascript" src="{{ url_for('static', filename='recorder.js') }}"></script>      
+  </div>
+  <img id="video" src="{{ url_for('video_viewer') }}">
+</body>
+</html>

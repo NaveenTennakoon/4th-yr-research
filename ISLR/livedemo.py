@@ -35,15 +35,15 @@ def livedemo(diVideoSet, fused=False):
 	baseClasses = VideoClasses(baseClassFile)
 	classes = VideoClasses(classFile)
 
-	h, w = 220, 310
+	h, w = 240, 427
 
 	if fused:
-		sModelFile = "model/12-earlyfuse-tl-rc-full-best.h5"
+		sModelFile = "saved_models/12.h5"
 		keI3D = I3D_load(sModelFile)
 
 	else:
-		sFlowModelFile = "model/12-oflow-tl-rc-full-best.h5"
-		sLipModelFile = "model/12-lip-tl-full-best.h5"
+		sFlowModelFile = "saved_models/12.h5"
+		sLipModelFile = "saved_models/12.h5"
 	
 		keI3Dbase = I3D_load(sFlowModelFile)
 		keI3DLip = I3D_load(sLipModelFile)
@@ -189,7 +189,7 @@ def predictForVideo(diVideoSet, fused:bool=False):
 if __name__ == '__main__':
 
 	fused = False
-	fromVideo = True
+	fromVideo = False
 
 	diVideoSet = {
 		"sName" : "signs",

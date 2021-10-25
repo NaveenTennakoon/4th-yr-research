@@ -1,9 +1,26 @@
-__pycache__
+additional
+dataset utilities
 
-data
-log
-saved_models
-models
-videos
+ISLR/__pycache__
+ISLR/log
+ISLR/saved_models
+ISLR/models
+ISLR/videos
+ISLR/test*
+ISLR/data/signs
+ISLR/data/slsl-22/360p-unprocessed
+ISLR/data/slsl-22/islsl-22
+ISLR/data/slsl-22/original
 
-test*
+CSLR/__pycache__
+CSLR/src/__pycache__
+CSLR/data/features
+CSLR/logs
+CSLR/ckpt
+CSLR/*sw*
+CSLR/results
+CSLR/examples
+CSLR/tools
+CSLR/.python-version
+
+front-end-application/__pycache__

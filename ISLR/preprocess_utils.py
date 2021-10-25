@@ -222,7 +222,7 @@ def images_normalize(arFrames:np.array, targetNum:int, height:int, width:int, fl
 
     # downsample and crop the image frames
     arFrames = frames_downsample(arFrames, targetNum)
-    arFrames = random_crop_images(arFrames, height, width)
+    arFrames = images_crop(arFrames, height, width)
 
     if flip:
         arFrames = random_flip_images(arFrames)
@@ -286,14 +286,14 @@ def videosDir2framesDir(videoDir:str, frameDir:str, framesNorm:int = None,
         sTargetDir = frameDir + "/" + li_videoPath[-3] + "/" + li_videoPath[-2] + "/" + sVideoName
         
         # check if frames already extracted
-        if framesNorm != None and os.path.exists(sTargetDir):
-            nFrames = len(glob.glob(sTargetDir + "/*.*"))
-            if nFrames == framesNorm: 
-                print("Video %5d already extracted to %s" % (counter, sTargetDir))
-                counter += 1
-                continue
-            else: 
-                print("Video %5d: Directory with %d instead of %d frames detected" % (counter, nFrames, framesNorm))
+        if os.path.exists(sTargetDir):
+            # nFrames = len(glob.glob(sTargetDir + "/*.*"))
+            # if nFrames == framesNorm: 
+            print("Video %5d already extracted to %s" % (counter, sTargetDir))
+            counter += 1
+            continue
+            # else: 
+            #     print("Video %5d: Directory with %d instead of %d frames detected" % (counter, nFrames, framesNorm))
         
         # create target directory
         os.makedirs(sTargetDir, exist_ok = True)

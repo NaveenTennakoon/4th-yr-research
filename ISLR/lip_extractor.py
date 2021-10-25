@@ -27,11 +27,11 @@ def extract_lip_image(minsize:int, threshold:list, factor:float, path:str, \
             center = (int(points[3, 0]) + distances[0], int(points[8, 0]) + distances[1])
         else:
             center = (int(points[3, 0]) + distances[0], int(points[9, 0]) + distances[1])
-        top_left = (center[0] - 10, center[1] - 8)
-        bottom_right = (center[0] + 10, center[1] + 8)
+        top_left = (center[0] - 8, center[1] - 8)
+        bottom_right = (center[0] + 8, center[1] + 8)
         canvas = canvas[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
         canvas = cv2.cvtColor(canvas, 3)
-        canvas = cv2.resize(canvas, dsize = (0,0), fx = 8, fy = 8, interpolation=cv2.INTER_LINEAR)
+        canvas = cv2.resize(canvas, dsize = (0,0), fx = 4, fy = 4, interpolation=cv2.INTER_LINEAR)
     else: warnings.warn("Too many points obtained for input image")
     
     return np.array(canvas)
@@ -60,11 +60,11 @@ def bodyFrames2LipFrames(arFrames:np.array) -> np.array:
                 center = (int(points[3, 0]) + distances[0], int(points[8, 0]) + distances[1])
             else:
                 center = (int(points[3, 0]) + distances[0], int(points[9, 0]) + distances[1])
-            top_left = (center[0] - 10, center[1] - 8)
-            bottom_right = (center[0] + 10, center[1] + 8)
+            top_left = (center[0] - 8, center[1] - 8)
+            bottom_right = (center[0] + 8, center[1] + 8)
             frame = arFrames[nFrame, top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
-            frame = cv2.cvtColor(frame, 3)
-            frame = cv2.resize(frame, dsize = (0,0), fx = 8, fy = 8, interpolation=cv2.INTER_LINEAR)
+            # frame = cv2.cvtColor(frame, 3)
+            frame = cv2.resize(frame, dsize = (0,0), fx = 4, fy = 4, interpolation=cv2.INTER_LINEAR)
             liFrames.append(frame)
         else: warnings.warn("Too many points obtained for input image")
     

@@ -2,12 +2,13 @@ from keras.layers import Dense, LSTM, Input, Dropout, Permute, multiply
 from keras.models import Model
 
 def Att_LSTM():
-    input = Input(shape=(40, 4096), name='input')
-    attention = attention_block(input, 40)
+    input = Input(shape=(40, 2048), name='input')
+    fc_0 = Dense(4096, activation='relu', name='fc_0')(input)
+    attention = attention_block(fc_0, 40)
     lstm = LSTM(512, return_sequences=False, dropout=0.3, recurrent_dropout=0.2)(attention)
-    fc_1 = Dense(512, activation='relu', name='fc_1')(lstm)
+    fc_1 = Dense(4096, activation='relu', name='fc_1')(lstm)
     drop_1 = Dropout(0.5)(fc_1)
-    fc_2 = Dense(512, activation='relu', name='fc_2')(drop_1)
+    fc_2 = Dense(4096, activation='relu', name='fc_2')(drop_1)
     drop_2 = Dropout(0.5)(fc_2)
     out = Dense(12, activation='softmax', name='classification')(drop_2)
     model = Model(input, out, name='att-lstm')
