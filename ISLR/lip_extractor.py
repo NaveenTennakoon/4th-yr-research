@@ -81,7 +81,7 @@ def bodyFramesDir2lipFrameDir(bodyBaseDir:str, lipBaseDir:str, minsize:int, \
     # get list of directories with frames: ... / bodyBaseDir/train/class/videodir/body.jpg
     currentDir = os.getcwd()
     os.chdir(bodyBaseDir)
-    videos = sorted(glob.glob("*/*/*"))
+    videos = sorted(glob.glob("*/*"))
     os.chdir(currentDir)
     print("Found %d directories=videos with frames in %s" % (len(videos), bodyBaseDir))
 
@@ -124,3 +124,11 @@ def bodyFramesDir2lipFrameDir(bodyBaseDir:str, lipBaseDir:str, minsize:int, \
         counter += 1 
 
     return
+
+if __name__ == '__main__':
+    bodyFramesDir2lipFrameDir(
+        '../CSLR/data/features/ff',
+        '../CSLR/data/features/lip',
+        minsize = 40,
+        threshold = [ 0.6, 0.7, 0.7 ],
+        factor = 0.709) 
