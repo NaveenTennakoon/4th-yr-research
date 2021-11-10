@@ -37,5 +37,5 @@ class SSLCorpus(Corpus):
         return df
 
     def get_frames(self, sample):
-        frames = (self.root / "features" / sample["folder"]).glob("*.jpg")
+        frames = (self.root / "features" / "lip" / sample["folder"]).glob("*.jpg")
         return sorted(frames)

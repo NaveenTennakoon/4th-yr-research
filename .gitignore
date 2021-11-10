@@ -8,12 +8,13 @@ ISLR/models
 ISLR/videos
 ISLR/test*
 ISLR/data/signs
-ISLR/data/slsl-22/360p-unprocessed
+ISLR/data/slsl-22/lip
 ISLR/data/slsl-22/islsl-22
-ISLR/data/slsl-22/original
 
 CSLR/__pycache__
+CSLR/dataset_utils/__pycache__
 CSLR/src/__pycache__
+CSLR/src/model/__pycache__
 CSLR/data/features
 CSLR/logs
 CSLR/ckpt
