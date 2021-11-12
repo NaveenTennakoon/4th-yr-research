@@ -12,7 +12,7 @@ from einops import rearrange
 from dataset_utils import SSLVideoTextDataset
 from dataset_utils.wer import calculate_wer
 
-from .model import Model
+from .fusion_model import Model
 
 
 class Runner(torchzq.LegacyRunner):
@@ -22,6 +22,7 @@ class Runner(torchzq.LegacyRunner):
         data_root: Path = "data",
         p_drop: float = 0.5,
         # augmentation
+        lip_base_size: custom(type=int, nargs=2) = [64, 64],
         base_size: custom(type=int, nargs=2) = [256, 256],
         crop_size: custom(type=int, nargs=2) = [224, 224],
         # model
@@ -34,6 +35,7 @@ class Runner(torchzq.LegacyRunner):
         heads: int = 4,
         semantic_layers: int = 2,
         dropout: float = 0.1,
+        add_ratio: float = 1.0,
         # loss
         ent_coef: float = 0.01,
         monte_carlo_samples: int = 32,
@@ -84,6 +86,7 @@ class Runner(torchzq.LegacyRunner):
             random_crop=self.training,
             crop_size=args.crop_size,
             base_size=args.base_size,
+            lip_base_size=args.lip_base_size,
         )
 
         if args.head is not None:
@@ -107,17 +110,19 @@ class Runner(torchzq.LegacyRunner):
 
     def prepare_batch(self, batch):
         args = self.args
-        x, y = batch["video"], batch["label"]
-        for i in range(len(x)):
-            x[i] = x[i].to(args.device)
+        x1, x2, y = batch["f_frames"], batch["l_frames"], batch["label"]
+        for i in range(len(x1)):
+            x1[i] = x1[i].to(args.device)
+            x2[i] = x2[i].to(args.device)
             y[i] = y[i].to(args.device)
-        batch["video"] = x
+        batch["f_frames"] = x1
+        batch["l_frames"] = x2
         batch["label"] = y
         self.batch = batch
         return batch
 
     def compute_loss(self, batch):
-        return self.model.compute_loss(batch["video"], batch["label"])
+        return self.model.compute_loss(batch["f_frames"], batch["l_frames"], batch["label"])
 
     @property
     def result_dir(self):
