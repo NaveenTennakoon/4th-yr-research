@@ -10,7 +10,7 @@ from torchzq.parsing import boolean, custom
 from pathlib import Path
 from einops import rearrange
 from dataset_utils import SSLVideoTextDataset
-from dataset_utils.wer import calculate_wer
+from jiwer import wer, ReduceToSingleSentence
 
 from .fusion_model import Model
 
@@ -35,7 +35,6 @@ class Runner(torchzq.LegacyRunner):
         heads: int = 4,
         semantic_layers: int = 2,
         dropout: float = 0.1,
-        add_ratio: float = 1.0,
         # loss
         ent_coef: float = 0.01,
         monte_carlo_samples: int = 32,
@@ -111,18 +110,22 @@ class Runner(torchzq.LegacyRunner):
     def prepare_batch(self, batch):
         args = self.args
         x1, x2, y = batch["f_frames"], batch["l_frames"], batch["label"]
+        # x, y = batch["video"], batch["label"]
         for i in range(len(x1)):
             x1[i] = x1[i].to(args.device)
             x2[i] = x2[i].to(args.device)
+            # x[i] = x[i].to(args.device)
             y[i] = y[i].to(args.device)
         batch["f_frames"] = x1
         batch["l_frames"] = x2
+        # batch["video"] = x
         batch["label"] = y
         self.batch = batch
         return batch
 
     def compute_loss(self, batch):
         return self.model.compute_loss(batch["f_frames"], batch["l_frames"], batch["label"])
+        # return self.model.compute_loss(batch["video"], batch["label"])
 
     @property
     def result_dir(self):
@@ -143,8 +146,11 @@ class Runner(torchzq.LegacyRunner):
             prob = []
             for batch in tqdm.tqdm(self.data_loader):
                 batch = self.prepare_batch(batch)
-                video = batch["video"]
-                prob += [lpi.exp().cpu().numpy() for lpi in self.model(video)]
+                f_frames = batch["f_frames"]
+                l_frames = batch["l_frames"]
+                # video = batch["video"]
+                prob += [lpi.exp().cpu().numpy() for lpi in self.model(f_frames, l_frames)]
+                # prob += [lpi.exp().cpu().numpy() for lpi in self.model(video)]
             np.savez_compressed(prob_path, prob=prob)
 
         hyp = self.model.decode(
@@ -162,10 +168,22 @@ class Runner(torchzq.LegacyRunner):
                 label.append(self.vocab.mapping[word])
             ground_truths.append(label)
 
-        WER = 0
+        gt = []
+        pt = []
+        # WER = 0
         for tl, pl in zip(ground_truths, hyp):
-            wer = calculate_wer(tl, pl)
-            WER += wer
+            tl = [str(x) for x in tl]
+            tl = ReduceToSingleSentence()(tl)
+            pl = [str(x) for x in pl]            
+            pl = ReduceToSingleSentence()(pl)
+            if pl == []:
+                pl = ['']
+            gt += tl
+            pt += pl
+            # wer_cal = wer(tl, pl) 
+            # WER += wer_cal
+
+        WER = wer(gt, pt) * 100
         print(WER)
 
     @staticmethod
