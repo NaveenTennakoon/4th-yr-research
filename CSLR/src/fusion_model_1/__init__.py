@@ -9,10 +9,11 @@ from collections import defaultdict
 from multiprocessing import Pool
 from functools import partial
 from collections import Counter
-import numpy as np
 
-from .sgs import SGSResNet18
-from .xfmr import TransformerEncoder, MultiChannelTransformerEncoder
+from .visual import SGSResNet18
+from .sgs import create_sgs_applier
+from .xfmr import TransformerEncoder
+from .mc_xfmr import MC_TransformerEncoder
 from .dec import Decoder
 
 
@@ -53,22 +54,15 @@ class Model(nn.Module):
         self.use_sfl = use_sfl
         self.monte_carlo_samples = monte_carlo_samples
         self.ent_coef = ent_coef
-        self.add_ratio = add_ratio
+        self.p_detach = p_detach
 
         self.max_num_states = max_num_states
         self.vocab_size = vocab_size
 
-        self.ff_visual = SGSResNet18(
-            dim,
-            p_detach,
-        )
+        self.ff_visual = SGSResNet18(dim)
+        self.lf_visual = SGSResNet18(dim)
 
-        self.lf_visual = SGSResNet18(
-            dim,
-            p_detach,
-        )
-
-        self.ff_semantic = TransformerEncoder(
+        self.f_semantic = TransformerEncoder(
             dim,
             heads,
             semantic_layers,
@@ -76,7 +70,7 @@ class Model(nn.Module):
             rpe_k,
         )
 
-        self.lf_semantic = TransformerEncoder(
+        self.l_semantic = TransformerEncoder(
             dim,
             heads,
             semantic_layers,
@@ -84,7 +78,15 @@ class Model(nn.Module):
             rpe_k,
         )
 
-        self.mclf_semantic = MultiChannelTransformerEncoder(
+        self.mcf_semantic = MC_TransformerEncoder(
+            dim,
+            heads,
+            semantic_layers,
+            dropout,
+            rpe_k,
+        )
+
+        self.mcl_semantic = MC_TransformerEncoder(
             dim,
             heads,
             semantic_layers,
@@ -98,10 +100,7 @@ class Model(nn.Module):
         )
 
         # plus 1 for blank
-        self.ff_classifier = nn.Linear(dim, self.decoder.total_states + 1, bias=False)
-
-        # plus 1 for blank
-        self.lf_classifier = nn.Linear(dim, self.decoder.total_states + 1, bias=False)
+        self.classifier = nn.Linear(dim*2, self.decoder.total_states + 1, bias=False)
 
         self.blank = self.decoder.total_states  # last dim as blank
 
@@ -114,24 +113,23 @@ class Model(nn.Module):
         """
         xl = list(map(len, x1))
 
-        x1 = self.ff_visual(x1)
-        x2 = self.lf_visual(x2)
+        sgs_apply = create_sgs_applier(self.p_detach, xl)
 
-        x1 = self.ff_semantic(x1)
-        x2 = self.lf_semantic(x2)
+        x1 = self.ff_visual(x1, sgs_apply)
+        x1 = self.f_semantic(x1)
 
-        x2 = self.mclf_semantic(x2, x1)
+        x2 = self.lf_visual(x2, sgs_apply)
+        x2 = self.l_semantic(x2)
 
-        x1 = torch.cat(x1)
-        x2 = torch.cat(x2)
+        x1_out = self.mcf_semantic(x1, x2)
+        x2_out = self.mcl_semantic(x2, x1)
 
-        x1 = self.ff_classifier(x1)
-        x2 = self.lf_classifier(x2)
+        x1_out = torch.cat(x1_out)
+        x2_out = torch.cat(x2_out)
+        x = torch.cat([x1_out, x2_out], dim=1)
 
-        x2 = torch.mul(x2, self.add_ratio)
-
-        x = x1 + x2
-        x = x.log_softmax(dim=-1)      
+        x = self.classifier(x)
+        x = x.log_softmax(dim=-1)
         x = x.split(xl)
 
         return x
@@ -152,6 +150,7 @@ class Model(nn.Module):
         yl = torch.tensor(list(map(len, y)))
         x = pad_sequence(x, False)  # -> (t b c)
         y = pad_sequence(y, True)  # -> (b s)
+
         return F.ctc_loss(x, y, xl, yl, self.blank, reduction, True)
 
     @staticmethod
@@ -171,14 +170,15 @@ class Model(nn.Module):
     def compute_loss(self, x1, x2, y):
         """
         Args:
-            x: videos, [(t c h w)], i.e. list of (t c h w)
+            x1: ff_videos, [(t c h w)], i.e. list of (t c h w)
+            x2: lf_videos, [(t c h w)], i.e. list of (t c h w)
             y: labels, [(t')]
         Returns:
             losses, dict of all losses, sum then and then backward
         """
-        lp = self(x1, x2)
+        lpi = self(x1, x2)
         s = [self.expand(yi) for yi in y]
-        losses = {"ctc_loss": self.compute_ctc_loss(lp, s)}
+        losses = {"ctc_loss": self.compute_ctc_loss(lpi, s)}
 
         return losses
 
