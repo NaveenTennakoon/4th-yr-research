@@ -10,7 +10,7 @@ from torchzq.parsing import boolean, custom
 from pathlib import Path
 from einops import rearrange
 from dataset_utils import SSLVideoTextDataset
-from jiwer import wer, ReduceToSingleSentence
+from jiwer import ReduceToSingleSentence, compute_measures
 
 from .model import Model
 
@@ -161,6 +161,7 @@ class Runner(torchzq.LegacyRunner):
             args.nj,
         )
 
+        # WER calculation steps
         ground_truths = []        
         for sentence in self.dataset.data_frame["annotation"]:
             label = []
@@ -170,7 +171,6 @@ class Runner(torchzq.LegacyRunner):
 
         gt = []
         pt = []
-        # WER = 0
         for tl, pl in zip(ground_truths, hyp):
             tl = [str(x) for x in tl]
             tl = ReduceToSingleSentence()(tl)
@@ -180,11 +180,18 @@ class Runner(torchzq.LegacyRunner):
                 pl = ['']
             gt += tl
             pt += pl
-            # wer_cal = wer(tl, pl) 
-            # WER += wer_cal
 
-        WER = wer(gt, pt) * 100
-        print(WER)
+        measures = compute_measures(gt, pt)
+        print("\n OVERALL MEASURES \n\n", \
+            f"Word Error rate (WER) : {round(measures['wer'] * 100, 2)} \n", \
+            f"Match Error Rate (MER) : {round(measures['mer'] * 100, 2)} \n", \
+            f"Word Information Lost (WIL) : {round(measures['wil'] * 100, 2)} \n", \
+            f"Word Information Preserved (WIP) : {round(measures['wip'] * 100, 2)} \n", \
+            f"Hits : {measures['hits']} \n", \
+            f"Substitutions : {measures['substitutions']} \n", \
+            f"Deletions : {measures['deletions']} \n", \
+            f"Insertions : {measures['insertions']}", \
+        )
 
     @staticmethod
     def write_txt(path, content):
