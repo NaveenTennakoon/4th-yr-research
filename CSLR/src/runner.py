@@ -182,15 +182,25 @@ class Runner(torchzq.LegacyRunner):
             pt += pl
 
         measures = compute_measures(gt, pt)
+        measures['wer'] = round(measures['wer'] * 100, 2)
+        measures['mer'] = round(measures['mer'] * 100, 2)
+        measures['wil'] = round(measures['wil'] * 100, 2)
+        measures['wip'] = round(measures['wip'] * 100, 2)
+        total_gt_words = measures['hits'] + measures['substitutions'] + measures['deletions']
+        hit_percentage = round((measures['hits'] / total_gt_words) * 100, 2)
+        sub_percentage = round((measures['substitutions'] / total_gt_words) * 100, 2)
+        del_percentage = round((measures['deletions'] / total_gt_words) * 100, 2)
+        ins_percentage = round((measures['insertions'] / total_gt_words) * 100, 2)
+
         print("\n OVERALL MEASURES \n\n", \
-            f"Word Error rate (WER) : {round(measures['wer'] * 100, 2)} \n", \
-            f"Match Error Rate (MER) : {round(measures['mer'] * 100, 2)} \n", \
-            f"Word Information Lost (WIL) : {round(measures['wil'] * 100, 2)} \n", \
-            f"Word Information Preserved (WIP) : {round(measures['wip'] * 100, 2)} \n", \
-            f"Hits : {measures['hits']} \n", \
-            f"Substitutions : {measures['substitutions']} \n", \
-            f"Deletions : {measures['deletions']} \n", \
-            f"Insertions : {measures['insertions']}", \
+            f"Word Error rate (WER) : {measures['wer']} \n", \
+            f"Match Error Rate (MER) : {measures['mer']} \n", \
+            f"Word Information Lost (WIL) : {measures['wil']} \n", \
+            f"Word Information Preserved (WIP) : {measures['wip']} \n", \
+            f"Hits : {measures['hits']} ({hit_percentage}%) \n", \
+            f"Substitutions : {measures['substitutions']} ({sub_percentage}%) \n", \
+            f"Deletions : {measures['deletions']} ({del_percentage}%) \n", \
+            f"Insertions : {measures['insertions']} ({ins_percentage}%)", \
         )
 
     @staticmethod
