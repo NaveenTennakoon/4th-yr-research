@@ -38,6 +38,7 @@ class SSLCorpus(Corpus):
 
     def get_frames(self, sample):
         frames = (self.root / "features" / "ff" / sample["folder"]).glob("*.jpg")
+        # frames = (self.root / "features" / "lip" / sample["folder"]).glob("*.jpg")
         return sorted(frames)
 
     # def get_frames(self, sample):
