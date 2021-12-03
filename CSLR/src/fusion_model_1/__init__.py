@@ -10,10 +10,8 @@ from multiprocessing import Pool
 from functools import partial
 from collections import Counter
 
-from .visual import SGSResNet18
-from .sgs import create_sgs_applier
+from .sgs import SGSResNet18
 from .xfmr import TransformerEncoder
-from .mc_xfmr import MC_TransformerEncoder
 from .dec import Decoder
 
 
@@ -32,7 +30,6 @@ class Model(nn.Module):
         semantic_layers=2,
         dropout=0.1,
         monte_carlo_samples=32,
-        add_ratio=1.0
     ):
         """
         Args:
@@ -48,45 +45,21 @@ class Model(nn.Module):
             semantic_layers: number of layers for transformer encoder.
             dropout: p_dropout.
             monte_carlo_samples: number of Monte Carlo sampling for stochastic fine-grained labeling.
-            add_ratio: ratio of second stream considered with main stream.
         """
         super().__init__()
         self.use_sfl = use_sfl
         self.monte_carlo_samples = monte_carlo_samples
         self.ent_coef = ent_coef
-        self.p_detach = p_detach
 
         self.max_num_states = max_num_states
         self.vocab_size = vocab_size
 
-        self.ff_visual = SGSResNet18(dim)
-        self.lf_visual = SGSResNet18(dim)
-
-        self.f_semantic = TransformerEncoder(
+        self.visual = SGSResNet18(
             dim,
-            heads,
-            semantic_layers,
-            dropout,
-            rpe_k,
+            p_detach,
         )
 
-        self.l_semantic = TransformerEncoder(
-            dim,
-            heads,
-            semantic_layers,
-            dropout,
-            rpe_k,
-        )
-
-        self.mcf_semantic = MC_TransformerEncoder(
-            dim,
-            heads,
-            semantic_layers,
-            dropout,
-            rpe_k,
-        )
-
-        self.mcl_semantic = MC_TransformerEncoder(
+        self.semantic = TransformerEncoder(
             dim,
             heads,
             semantic_layers,
@@ -100,58 +73,72 @@ class Model(nn.Module):
         )
 
         # plus 1 for blank
-        self.classifier = nn.Linear(dim*2, self.decoder.total_states + 1, bias=False)
+        self.classifier = nn.Linear(dim, self.decoder.total_states + 1, bias=False)
 
         self.blank = self.decoder.total_states  # last dim as blank
+
+        if use_sfl:
+            self.predictor = nn.Sequential(
+                nn.Embedding(vocab_size, rdim),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, max_num_states),
+            )
+
+            self.baseline = nn.Sequential(
+                nn.Embedding(vocab_size, rdim),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, 1),
+            )
 
     def forward(self, x1, x2):
         """
         Args:
-            x: list of (t c h w)
+            x1: list of (t c h w)
+            x2: list of (t c h w)
         Return:
             log probs [(t n)]
         """
         xl = list(map(len, x1))
-
-        sgs_apply = create_sgs_applier(self.p_detach, xl)
-
-        x1 = self.ff_visual(x1, sgs_apply)
-        x1 = self.f_semantic(x1)
-
-        x2 = self.lf_visual(x2, sgs_apply)
-        x2 = self.l_semantic(x2)
-
-        x1_out = self.mcf_semantic(x1, x2)
-        x2_out = self.mcl_semantic(x2, x1)
-
-        x1_out = torch.cat(x1_out)
-        x2_out = torch.cat(x2_out)
-        x = torch.cat([x1_out, x2_out], dim=1)
-
-        x = self.classifier(x)
-        x = x.log_softmax(dim=-1)
-        x = x.split(xl)
-
-        return x
+        x1, x2 = self.visual(x1, x2)
+        x1, x2 = self.semantic(x1, x2)
+        x1 = torch.cat(x1)
+        x1 = self.classifier(x1)
+        x1 = x1.log_softmax(dim=-1)
+        x2 = torch.cat(x2)
+        x2 = self.classifier(x2)
+        x2 = x2.log_softmax(dim=-1)
+        x1 = x1.split(xl)
+        x2 = x2.split(xl)
+        return x1, x2
 
     def expand(self, y, n=None):
         """Expand to tensor"""
         return torch.tensor(self.decoder.expand(y, n)).to(y.device)
 
-    def compute_ctc_loss(self, x, y, reduction="mean"):
+    def compute_ctc_loss(self, x1, x2, y, reduction="mean"):
         """
         Args:
-            x: log_probs, (t d)
+            x1: log_probs, (t d)
+            x2: log_probs, (t d)
             y: labels, (t')
         Return:
             loss
         """
-        xl = torch.tensor(list(map(len, x)))
+        xl = torch.tensor(list(map(len, x1)))
         yl = torch.tensor(list(map(len, y)))
-        x = pad_sequence(x, False)  # -> (t b c)
+        x1 = pad_sequence(x1, False)  # -> (t b c)
+        x2 = pad_sequence(x2, False)  # -> (t b c)
         y = pad_sequence(y, True)  # -> (b s)
-
-        return F.ctc_loss(x, y, xl, yl, self.blank, reduction, True)
+        loss1 = F.ctc_loss(x1, y, xl, yl, self.blank, reduction, True)
+        loss2 = F.ctc_loss(x2, y, xl, yl, self.blank, reduction, True)
+        avg_loss = (loss1 + loss2) / 2
+        return avg_loss
 
     @staticmethod
     def mean_over_time(l):
@@ -170,16 +157,15 @@ class Model(nn.Module):
     def compute_loss(self, x1, x2, y):
         """
         Args:
-            x1: ff_videos, [(t c h w)], i.e. list of (t c h w)
-            x2: lf_videos, [(t c h w)], i.e. list of (t c h w)
+            x1: videos, [(t c h w)], i.e. list of (t c h w)
+            x2: videos, [(t c h w)], i.e. list of (t c h w)
             y: labels, [(t')]
         Returns:
             losses, dict of all losses, sum then and then backward
         """
-        lpi = self(x1, x2)
+        lp1, lp2 = self(x1, x2)
         s = [self.expand(yi) for yi in y]
-        losses = {"ctc_loss": self.compute_ctc_loss(lpi, s)}
-
+        losses = {"ctc_loss": self.compute_ctc_loss(lp1, lp2, s)}
         return losses
 
     def decode(self, prob, beam_width, prune, lm=None, nj=8):
@@ -191,6 +177,10 @@ class Model(nn.Module):
             lm: probability of the last word given the prefix
             nj: number of jobs
         """
+        if self.use_sfl:
+            self.decoder.set_num_states(
+                {i: int(n) for i, n in enumerate(self.most_probable_num_states)}
+            )
 
         with Pool(nj) as pool:
             return list(

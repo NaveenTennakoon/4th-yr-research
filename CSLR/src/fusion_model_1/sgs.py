@@ -1,4 +1,7 @@
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision.models import resnet18
 
 
 def create_random_mask(l, p):
@@ -57,3 +60,30 @@ def create_sgs_applier(p_detach, lengths, pooled=True):
         return slot
 
     return sgs_apply
+
+
+class SGSResNet18(nn.Module):
+    def __init__(self, dim, p_detach=0):
+        super().__init__()
+        self.dim = dim
+        self.p_detach = p_detach
+        assert 0 <= p_detach <= 1, f"Invalid p_detach {p_detach}."
+        self.encoder = resnet18(True)
+        self.encoder.fc = nn.Linear(512, dim)
+
+    def forward(self, x1, x2):
+        """
+        Args:
+            x1: [(t c h w)]
+            x2: [(t c h w)]
+        Returns:
+            x1: [(t 512)]
+            x2: [(t 512)]
+        """
+        xl = list(map(len, x1))
+        sgs_apply = create_sgs_applier(self.p_detach, xl)
+        x1 = torch.cat(x1, dim=0)
+        x1 = sgs_apply(self.encoder, x1)
+        x2 = torch.cat(x2, dim=0)
+        x2 = sgs_apply(self.encoder, x2)
+        return list(x1.split(xl)), list(x2.split(xl))
