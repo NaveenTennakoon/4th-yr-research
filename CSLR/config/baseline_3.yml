@@ -13,15 +13,15 @@ dropout: 0.1
 p_drop: 0.5
 p_detach: 0.75
 max_num_states: 1
-semantic_layers: 2
+semantic_layers: 3
 use_sfl: false
 
 batch_size: 2
 
 train:
-  max_epochs: 40
+  max_epochs: 30
   lr: "Lambda(lambda e: max(1e-4 * 0.95 ** ((e - 1) // 2), 1e-5), epochwise=True)"
-  save_every: 5
-  validate_every: 1
+  save_every: 1
+  validate_every: 30
   grad_clip_thres: 1.0
   use_fp16: false
