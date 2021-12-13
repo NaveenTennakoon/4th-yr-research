@@ -2,7 +2,7 @@ runner: python -m src.runner
 name: $from(config)
 
 # data
-data_root: data
+data_root: ../../data/slsl-22
 lip_base_size: [64, 64]
 base_size: [256, 256]
 crop_size: [224, 224]
@@ -17,7 +17,7 @@ max_num_states: 3
 semantic_layers: 2
 use_sfl: false
 
-batch_size: 1
+batch_size: 2
 
 train:
   max_epochs: 40

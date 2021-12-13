@@ -2,7 +2,7 @@ runner: python -m src.runner
 name: $from(config)
 
 # data
-data_root: data
+data_root: ../../data/slsl-22
 base_size: [64, 64]
 crop_size: [64, 64]
 
