@@ -16,7 +16,7 @@ max_num_states: 1
 semantic_layers: 3
 use_sfl: false
 
-batch_size: 2
+batch_size: 1
 
 train:
   max_epochs: 30

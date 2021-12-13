@@ -63,7 +63,7 @@ def bodyFrames2LipFrames(arFrames:np.array) -> np.array:
             top_left = (center[0] - 8, center[1] - 8)
             bottom_right = (center[0] + 8, center[1] + 8)
             frame = arFrames[nFrame, top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], :]
-            # frame = cv2.cvtColor(frame, 3)
+            frame = cv2.cvtColor(frame, 3)
             frame = cv2.resize(frame, dsize = (0,0), fx = 4, fy = 4, interpolation=cv2.INTER_LINEAR)
             liFrames.append(frame)
         else: warnings.warn("Too many points obtained for input image")

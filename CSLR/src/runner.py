@@ -22,7 +22,6 @@ class Runner(torchzq.LegacyRunner):
         data_root: Path = "data",
         p_drop: float = 0.5,
         # augmentation
-        lip_base_size: custom(type=int, nargs=2) = [64, 64],
         base_size: custom(type=int, nargs=2) = [256, 256],
         crop_size: custom(type=int, nargs=2) = [224, 224],
         # model
@@ -83,9 +82,10 @@ class Runner(torchzq.LegacyRunner):
             p_drop=args.p_drop,
             random_drop=self.training,
             random_crop=self.training,
+            random_flip=self.training,
+            random_jitter=self.training,
             crop_size=args.crop_size,
             base_size=args.base_size,
-            lip_base_size=args.lip_base_size,
         )
 
         if args.head is not None:
@@ -109,23 +109,32 @@ class Runner(torchzq.LegacyRunner):
 
     def prepare_batch(self, batch):
         args = self.args
-        # x1, x2, y = batch["f_frames"], batch["l_frames"], batch["label"]
+
+        # SINGLE INPUT
         x, y = batch["video"], batch["label"]
         for i in range(len(x)):
-            # x1[i] = x1[i].to(args.device)
-            # x2[i] = x2[i].to(args.device)
             x[i] = x[i].to(args.device)
             y[i] = y[i].to(args.device)
+        batch["video"] = x
+
+        # MULTIPLE INPUTS
+        # x1, x2, y = batch["f_frames"], batch["l_frames"], batch["label"]
+        # for i in range(len(x1)):
+            # x1[i] = x1[i].to(args.device)
+            # x2[i] = x2[i].to(args.device)
+            # y[i] = y[i].to(args.device)
         # batch["f_frames"] = x1
         # batch["l_frames"] = x2
-        batch["video"] = x
+
         batch["label"] = y
         self.batch = batch
         return batch
 
     def compute_loss(self, batch):
-        # return self.model.compute_loss(batch["f_frames"], batch["l_frames"], batch["label"])
+        # SINGLE INPUT
         return self.model.compute_loss(batch["video"], batch["label"])
+        # MULTIPLE INPUTS
+        # return self.model.compute_loss(batch["f_frames"], batch["l_frames"], batch["label"])
 
     @property
     def result_dir(self):
@@ -144,13 +153,20 @@ class Runner(torchzq.LegacyRunner):
             prob = np.load(prob_path, allow_pickle=True)["prob"]
         else:
             prob = []
+            
+            # SINGLE INPUT
             for batch in tqdm.tqdm(self.data_loader):
                 batch = self.prepare_batch(batch)
-                # f_frames = batch["f_frames"]
-                # l_frames = batch["l_frames"]
                 video = batch["video"]
-                # prob += [lpi.exp().cpu().numpy() for lpi in self.model(f_frames, l_frames)]
                 prob += [lpi.exp().cpu().numpy() for lpi in self.model(video)]
+
+            # MULTIPLE INPUTS
+            # for batch in tqdm.tqdm(self.data_loader):
+            #     batch = self.prepare_batch(batch)
+            #     f_frames = batch["f_frames"]
+            #     l_frames = batch["l_frames"]
+            #     prob += [lpi.exp().cpu().numpy() for lpi in self.model(f_frames, l_frames)]
+
             np.savez_compressed(prob_path, prob=prob)
 
         hyp = self.model.decode(

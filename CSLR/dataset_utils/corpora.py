@@ -36,11 +36,13 @@ class SSLCorpus(Corpus):
 
         return df
 
+    # SINGLE INPUT
     def get_frames(self, sample):
         frames = (self.root / "features" / "ff" / sample["folder"]).glob("*.jpg")
         # frames = (self.root / "features" / "lip" / sample["folder"]).glob("*.jpg")
         return sorted(frames)
 
+    # MULTIPLE INPUTS
     # def get_frames(self, sample):
     #     f_frames = (self.root / "features" / "ff" / sample["folder"]).glob("*.jpg")
     #     l_frames = (self.root / "features" / "lip" / sample["folder"]).glob("*.jpg")
