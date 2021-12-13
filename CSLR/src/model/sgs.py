@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import resnet18
 
-
 def create_random_mask(l, p):
     mask = torch.zeros(l).bool()
     idx = torch.randperm(l)
@@ -61,6 +60,7 @@ def create_sgs_applier(p_detach, lengths, pooled=True):
 
     return sgs_apply
 
+# this is to test
 
 class SGSResNet18(nn.Module):
     def __init__(self, dim, p_detach=0):
