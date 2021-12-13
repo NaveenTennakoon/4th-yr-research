@@ -71,19 +71,15 @@ class SGSResNet18(nn.Module):
         self.encoder = resnet18(True)
         self.encoder.fc = nn.Linear(512, dim)
 
-    def forward(self, x1, x2):
+    def forward(self, x):
         """
         Args:
-            x1: [(t c h w)]
-            x2: [(t c h w)]
+            x: [(t c h w)]
         Returns:
-            x1: [(t 512)]
-            x2: [(t 512)]
+            x: [(t 512)]
         """
-        xl = list(map(len, x1))
+        xl = list(map(len, x))
         sgs_apply = create_sgs_applier(self.p_detach, xl)
-        x1 = torch.cat(x1, dim=0)
-        x1 = sgs_apply(self.encoder, x1)
-        x2 = torch.cat(x2, dim=0)
-        x2 = sgs_apply(self.encoder, x2)
-        return list(x1.split(xl)), list(x2.split(xl))
+        x = torch.cat(x, dim=0)
+        x = sgs_apply(self.encoder, x)
+        return list(x.split(xl))

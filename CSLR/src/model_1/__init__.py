@@ -10,9 +10,8 @@ from multiprocessing import Pool
 from functools import partial
 from collections import Counter
 
-from .visual import SGSResNet18
-from .sgs import create_sgs_applier
-from .xfmr import TransformerEncoder
+from .sgs import SGSResNet18
+from .blstm import BiLSTM
 from .dec import Decoder
 
 
@@ -31,7 +30,6 @@ class Model(nn.Module):
         semantic_layers=2,
         dropout=0.1,
         monte_carlo_samples=32,
-        add_ratio=1.0
     ):
         """
         Args:
@@ -47,34 +45,24 @@ class Model(nn.Module):
             semantic_layers: number of layers for transformer encoder.
             dropout: p_dropout.
             monte_carlo_samples: number of Monte Carlo sampling for stochastic fine-grained labeling.
-            add_ratio: ratio of second stream considered with main stream.
         """
         super().__init__()
         self.use_sfl = use_sfl
         self.monte_carlo_samples = monte_carlo_samples
         self.ent_coef = ent_coef
-        self.p_detach = p_detach
 
         self.max_num_states = max_num_states
         self.vocab_size = vocab_size
 
-        self.ff_visual = SGSResNet18(dim)
-        self.lf_visual = SGSResNet18(dim)
-
-        self.f_semantic = TransformerEncoder(
+        self.visual = SGSResNet18(
             dim,
-            heads,
-            semantic_layers,
-            dropout,
-            rpe_k,
+            p_detach,
         )
 
-        self.l_semantic = TransformerEncoder(
+        self.semantic = BiLSTM(
             dim,
-            heads,
             semantic_layers,
             dropout,
-            rpe_k,
         )
 
         self.decoder = Decoder(
@@ -83,35 +71,43 @@ class Model(nn.Module):
         )
 
         # plus 1 for blank
-        self.classifier = nn.Linear(dim*2, self.decoder.total_states + 1, bias=False)
+        self.classifier = nn.Linear(dim, self.decoder.total_states + 1, bias=False)
 
         self.blank = self.decoder.total_states  # last dim as blank
 
-    def forward(self, x1, x2):
+        if use_sfl:
+            self.predictor = nn.Sequential(
+                nn.Embedding(vocab_size, rdim),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, max_num_states),
+            )
+
+            self.baseline = nn.Sequential(
+                nn.Embedding(vocab_size, rdim),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, rdim),
+                nn.ReLU(),
+                nn.Linear(rdim, 1),
+            )
+
+    def forward(self, x):
         """
         Args:
             x: list of (t c h w)
         Return:
             log probs [(t n)]
         """
-        xl = list(map(len, x1))
-
-        sgs_apply = create_sgs_applier(self.p_detach, xl)
-
-        x1 = self.ff_visual(x1, sgs_apply)
-        x1 = self.f_semantic(x1)
-
-        x2 = self.lf_visual(x2, sgs_apply)
-        x2 = self.l_semantic(x2)
-
-        x1 = torch.cat(x1)
-        x2 = torch.cat(x2)
-        x = torch.cat([x1, x2], dim=1)
-
+        xl = list(map(len, x))
+        x = self.visual(x)
+        x = self.semantic(x)
+        x = torch.cat(x)
         x = self.classifier(x)
         x = x.log_softmax(dim=-1)
         x = x.split(xl)
-
         return x
 
     def expand(self, y, n=None):
@@ -130,7 +126,6 @@ class Model(nn.Module):
         yl = torch.tensor(list(map(len, y)))
         x = pad_sequence(x, False)  # -> (t b c)
         y = pad_sequence(y, True)  # -> (b s)
-
         return F.ctc_loss(x, y, xl, yl, self.blank, reduction, True)
 
     @staticmethod
@@ -147,19 +142,73 @@ class Model(nn.Module):
     def most_probable_num_states(self):
         return (self.nsm1_dist.probs.argmax(-1) + 1).cpu()
 
-    def compute_loss(self, x1, x2, y):
+    def compute_sfl_losses(self, lp, y):
         """
         Args:
-            x1: ff_videos, [(t c h w)], i.e. list of (t c h w)
-            x2: lf_videos, [(t c h w)], i.e. list of (t c h w)
+            lp: log probs, (t c)
+            y: label, (t')
+        """
+        yl = list(map(len, y))
+        y = torch.cat(y)
+
+        ylogits = self.predictor(y)
+        dist = Categorical(logits=ylogits)
+
+        if self.training:
+            nsm1 = dist.sample()  # num states minus 1 (nsm1)
+        else:
+            nsm1 = dist.probs.argmax(dim=-1)
+
+        nll = -dist.log_prob(nsm1)
+        nll = self.mean_over_time(nll.split(yl))
+
+        s = [self.expand(yi, m1i + 1) for yi, m1i in zip(y.split(yl), nsm1.split(yl))]
+        sl = list(map(len, s))
+
+        ctc_loss = self.compute_ctc_loss(lp, s, reduction="none")
+        ctc_loss = self.mean_over_time([ci / sli for ci, sli in zip(ctc_loss, sl)])
+
+        # some ctc loss is zerored out due to invalid length
+        # zero out the corresponding baseline will disable
+        # the nll loss and bsl loss at the same time
+        baseline = self.mean_over_time(self.baseline(y).split(yl))
+        baseline[ctc_loss == 0] = 0
+
+        # neg ctc loss as reward
+        reward = -ctc_loss.detach()
+        reward_bar = reward - baseline.detach()
+
+        # reinforce loss
+        rif_loss = reward_bar * nll
+
+        nsm1_dist = self.nsm1_dist
+
+        return {
+            "ctc_loss": ctc_loss.mean(dim=0),
+            "rif_loss": rif_loss.mean(dim=0),
+            "ent_loss": -self.ent_coef * dist.entropy().mean(dim=0),
+            "bsl_loss": F.mse_loss(baseline, reward),
+        }
+
+    def compute_loss(self, x, y):
+        """
+        Args:
+            x: videos, [(t c h w)], i.e. list of (t c h w)
             y: labels, [(t')]
         Returns:
             losses, dict of all losses, sum then and then backward
         """
-        lpi = self(x1, x2)
-        s = [self.expand(yi) for yi in y]
-        losses = {"ctc_loss": self.compute_ctc_loss(lpi, s)}
-
+        lp = self(x)
+        if self.use_sfl:
+            losses = defaultdict(lambda: 0)
+            for _ in range(self.monte_carlo_samples):
+                for k, v in self.compute_sfl_losses(lp, y).items():
+                    losses[k] += v
+            for k in losses:
+                losses[k] /= self.monte_carlo_samples
+        else:
+            s = [self.expand(yi) for yi in y]
+            losses = {"ctc_loss": self.compute_ctc_loss(lp, s)}
         return losses
 
     def decode(self, prob, beam_width, prune, lm=None, nj=8):
@@ -171,6 +220,10 @@ class Model(nn.Module):
             lm: probability of the last word given the prefix
             nj: number of jobs
         """
+        if self.use_sfl:
+            self.decoder.set_num_states(
+                {i: int(n) for i, n in enumerate(self.most_probable_num_states)}
+            )
 
         with Pool(nj) as pool:
             return list(

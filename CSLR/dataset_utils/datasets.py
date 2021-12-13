@@ -31,7 +31,8 @@ class VideoTextDataset(Dataset):
         p_drop=0,
         random_drop=True,
         random_crop=True,
-        lip_base_size=[64, 64],
+        random_flip=True,
+        random_jitter=True,
         base_size=[256, 256],
         crop_size=[224, 224],
         vocab=None,
@@ -61,15 +62,26 @@ class VideoTextDataset(Dataset):
                 transforms.RandomCrop(crop_size)
                 if random_crop
                 else transforms.CenterCrop(crop_size),
+                # transforms.RandomHorizontalFlip(0.5)
+                # if random_flip
+                # else transforms.RandomHorizontalFlip(0),
+                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
+                if random_jitter
+                else transforms.ColorJitter(),
                 transforms.ToTensor(),
             ]
         )
-        # self.lf_transform = transforms.Compose(
-        #     [
-        #         transforms.Resize(lip_base_size),
-        #         transforms.ToTensor(),
-        #     ]
-        # )
+        self.lf_transform = transforms.Compose(
+            [
+                # transforms.RandomHorizontalFlip(0.5)
+                # if random_flip
+                # else transforms.RandomHorizontalFlip(0),
+                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
+                if random_jitter
+                else transforms.ColorJitter(),
+                transforms.ToTensor(),
+            ]
+        )
 
     def sample_indices(self, n):
         p_kept = 1 - self.p_drop
@@ -87,7 +99,8 @@ class VideoTextDataset(Dataset):
 
     def __len__(self):
         return len(self.data_frame)
-
+            
+    # SINGLE INPUT
     def __getitem__(self, index):
         sample = {**self.data_frame.iloc[index].to_dict()}  # copy
         frames = self.corpus.get_frames(sample)
@@ -97,6 +110,7 @@ class VideoTextDataset(Dataset):
         frames = [frames[i] for i in indices]
         frames = map(Image.open, frames)
         frames = map(self.ff_transform, frames)
+        # frames = map(self.lf_transform, frames)
         frames = np.stack(list(frames))
 
         label = list(map(self.vocab, sample["annotation"]))
@@ -108,6 +122,7 @@ class VideoTextDataset(Dataset):
 
         return sample
 
+    # MULTIPLE INPUTS
     # def __getitem__(self, index):
     #     sample = {**self.data_frame.iloc[index].to_dict()}  # copy
     #     f_frames, l_frames = self.corpus.get_frames(sample)
@@ -139,9 +154,12 @@ class VideoTextDataset(Dataset):
         collated = defaultdict_with_warning(list)
 
         for sample in batch:
+            # SINGLE INPUT
             collated["video"].append(torch.tensor(sample["video"]).float())
+            # MULTIPLE INPUTS
             # collated["f_frames"].append(torch.tensor(sample["f_frames"]).float())
             # collated["l_frames"].append(torch.tensor(sample["l_frames"]).float())
+
             collated["label"].append(torch.tensor(sample["label"]).long())
             # using text is deprecated, label is prefered
             collated["text"].append(torch.tensor(sample["label"]).long())

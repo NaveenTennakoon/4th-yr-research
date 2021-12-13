@@ -94,18 +94,22 @@ class TransformerEncoder(nn.Module):
                 )
             ]
 
-    def forward(self, x):
+    def forward(self, x1, x2):
         """
         Args:
             x: [(t d)]
         Returns:
             x: [(t d)]
         """
-        xl = list(map(len, x))
-        x = pad_sequence(x, True)
-        xm = key_padding_mask(xl).to(x.device)
+        xl = list(map(len, x1))
+        x1 = pad_sequence(x1, True)
+        x2 = pad_sequence(x2, True)
+        xm = key_padding_mask(xl).to(x1.device)
         xm = xm.unsqueeze(dim=1)  # repeat mask for all targets
         for layer in self.layers:
-            x = layer(x, xm)
-        x = self.norm(x)
-        return unpad_padded(x, xl)
+            x1 = layer(x1, xm)
+        for layer in self.layers:
+            x2 = layer(x2, xm)
+        x1 = self.norm(x1)
+        x2 = self.norm(x2) 
+        return unpad_padded(x1, xl), unpad_padded(x2, xl)

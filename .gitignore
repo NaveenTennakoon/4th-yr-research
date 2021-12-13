@@ -13,8 +13,8 @@ ISLR/data/slsl-22/islsl-22
 
 CSLR/__pycache__
 CSLR/dataset_utils/__pycache__
+CSLR/src/*/__pycache__
 CSLR/src/__pycache__
-CSLR/src/model/__pycache__
 CSLR/data/features
 CSLR/logs
 CSLR/ckpt

@@ -3,8 +3,10 @@ import time
 import numpy as np
 
 from flask import Flask, render_template, Response, jsonify, request
+
 from video_utils import show_text, get_byte_image
 from camera import VideoStream
+from ..ISLR.lip_extractor import bodyFrames2LipFrames
 
 app = Flask(__name__)
 
@@ -115,7 +117,8 @@ def video_stream():
 
         if status == 'translating':
             # SIGN TRANSLATION LOGIC HERE
-            print(captured_frames.shape)
+            lip_frames = bodyFrames2LipFrames(captured_frames)
+            print(captured_frames.shape, lip_frames.shape)
             # for frame in range(captured_frames.shape[0]):
                 # cv2.imshow("./frames", captured_frames[frame,:,:,:])
                 # cv2.imwrite("./frames/frame%04d.jpg" % frame, captured_frames[frame,:,:,:])

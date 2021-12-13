@@ -11,7 +11,7 @@ from functools import partial
 from collections import Counter
 
 from .sgs import SGSResNet18
-from .xfmr import TransformerEncoder
+from .rnn import RNN
 from .dec import Decoder
 
 
@@ -59,12 +59,10 @@ class Model(nn.Module):
             p_detach,
         )
 
-        self.semantic = TransformerEncoder(
+        self.semantic = RNN(
             dim,
-            heads,
             semantic_layers,
             dropout,
-            rpe_k,
         )
 
         self.decoder = Decoder(
@@ -96,49 +94,39 @@ class Model(nn.Module):
                 nn.Linear(rdim, 1),
             )
 
-    def forward(self, x1, x2):
+    def forward(self, x):
         """
         Args:
-            x1: list of (t c h w)
-            x2: list of (t c h w)
+            x: list of (t c h w)
         Return:
             log probs [(t n)]
         """
-        xl = list(map(len, x1))
-        x1, x2 = self.visual(x1, x2)
-        x1, x2 = self.semantic(x1, x2)
-        x1 = torch.cat(x1)
-        x1 = self.classifier(x1)
-        x1 = x1.log_softmax(dim=-1)
-        x2 = torch.cat(x2)
-        x2 = self.classifier(x2)
-        x2 = x2.log_softmax(dim=-1)
-        x1 = x1.split(xl)
-        x2 = x2.split(xl)
-        return x1, x2
+        xl = list(map(len, x))
+        x = self.visual(x)
+        x = self.semantic(x)
+        x = torch.cat(x)
+        x = self.classifier(x)
+        x = x.log_softmax(dim=-1)
+        x = x.split(xl)
+        return x
 
     def expand(self, y, n=None):
         """Expand to tensor"""
         return torch.tensor(self.decoder.expand(y, n)).to(y.device)
 
-    def compute_ctc_loss(self, x1, x2, y, reduction="mean"):
+    def compute_ctc_loss(self, x, y, reduction="mean"):
         """
         Args:
-            x1: log_probs, (t d)
-            x2: log_probs, (t d)
+            x: log_probs, (t d)
             y: labels, (t')
         Return:
             loss
         """
-        xl = torch.tensor(list(map(len, x1)))
+        xl = torch.tensor(list(map(len, x)))
         yl = torch.tensor(list(map(len, y)))
-        x1 = pad_sequence(x1, False)  # -> (t b c)
-        x2 = pad_sequence(x2, False)  # -> (t b c)
+        x = pad_sequence(x, False)  # -> (t b c)
         y = pad_sequence(y, True)  # -> (b s)
-        loss1 = F.ctc_loss(x1, y, xl, yl, self.blank, reduction, True)
-        loss2 = F.ctc_loss(x2, y, xl, yl, self.blank, reduction, True)
-        avg_loss = (loss1 + loss2) / 2
-        return avg_loss
+        return F.ctc_loss(x, y, xl, yl, self.blank, reduction, True)
 
     @staticmethod
     def mean_over_time(l):
@@ -154,18 +142,73 @@ class Model(nn.Module):
     def most_probable_num_states(self):
         return (self.nsm1_dist.probs.argmax(-1) + 1).cpu()
 
-    def compute_loss(self, x1, x2, y):
+    def compute_sfl_losses(self, lp, y):
         """
         Args:
-            x1: videos, [(t c h w)], i.e. list of (t c h w)
-            x2: videos, [(t c h w)], i.e. list of (t c h w)
+            lp: log probs, (t c)
+            y: label, (t')
+        """
+        yl = list(map(len, y))
+        y = torch.cat(y)
+
+        ylogits = self.predictor(y)
+        dist = Categorical(logits=ylogits)
+
+        if self.training:
+            nsm1 = dist.sample()  # num states minus 1 (nsm1)
+        else:
+            nsm1 = dist.probs.argmax(dim=-1)
+
+        nll = -dist.log_prob(nsm1)
+        nll = self.mean_over_time(nll.split(yl))
+
+        s = [self.expand(yi, m1i + 1) for yi, m1i in zip(y.split(yl), nsm1.split(yl))]
+        sl = list(map(len, s))
+
+        ctc_loss = self.compute_ctc_loss(lp, s, reduction="none")
+        ctc_loss = self.mean_over_time([ci / sli for ci, sli in zip(ctc_loss, sl)])
+
+        # some ctc loss is zerored out due to invalid length
+        # zero out the corresponding baseline will disable
+        # the nll loss and bsl loss at the same time
+        baseline = self.mean_over_time(self.baseline(y).split(yl))
+        baseline[ctc_loss == 0] = 0
+
+        # neg ctc loss as reward
+        reward = -ctc_loss.detach()
+        reward_bar = reward - baseline.detach()
+
+        # reinforce loss
+        rif_loss = reward_bar * nll
+
+        nsm1_dist = self.nsm1_dist
+
+        return {
+            "ctc_loss": ctc_loss.mean(dim=0),
+            "rif_loss": rif_loss.mean(dim=0),
+            "ent_loss": -self.ent_coef * dist.entropy().mean(dim=0),
+            "bsl_loss": F.mse_loss(baseline, reward),
+        }
+
+    def compute_loss(self, x, y):
+        """
+        Args:
+            x: videos, [(t c h w)], i.e. list of (t c h w)
             y: labels, [(t')]
         Returns:
             losses, dict of all losses, sum then and then backward
         """
-        lp1, lp2 = self(x1, x2)
-        s = [self.expand(yi) for yi in y]
-        losses = {"ctc_loss": self.compute_ctc_loss(lp1, lp2, s)}
+        lp = self(x)
+        if self.use_sfl:
+            losses = defaultdict(lambda: 0)
+            for _ in range(self.monte_carlo_samples):
+                for k, v in self.compute_sfl_losses(lp, y).items():
+                    losses[k] += v
+            for k in losses:
+                losses[k] /= self.monte_carlo_samples
+        else:
+            s = [self.expand(yi) for yi in y]
+            losses = {"ctc_loss": self.compute_ctc_loss(lp, s)}
         return losses
 
     def decode(self, prob, beam_width, prune, lm=None, nj=8):
