@@ -99,24 +99,29 @@ class VideoTextDataset(Dataset):
 
     def __len__(self):
         return len(self.data_frame)
-            
-    # SINGLE INPUT
+
+    # MULTIPLE INPUTS
     def __getitem__(self, index):
         sample = {**self.data_frame.iloc[index].to_dict()}  # copy
-        frames = self.corpus.get_frames(sample)
+        f_frames, l_frames = self.corpus.get_frames(sample)
 
-        indices = self.sample_indices(len(frames))
+        indices = self.sample_indices(len(f_frames))
 
-        frames = [frames[i] for i in indices]
-        frames = map(Image.open, frames)
-        frames = map(self.ff_transform, frames)
-        frames = map(self.lf_transform, frames)
-        frames = np.stack(list(frames))
+        f_frames = [f_frames[i] for i in indices]
+        f_frames = map(Image.open, f_frames)
+        f_frames = map(self.ff_transform, f_frames)
+        f_frames = np.stack(list(f_frames))
+
+        l_frames = [l_frames[i] for i in indices]
+        l_frames = map(Image.open, l_frames)
+        l_frames = map(self.lf_transform, l_frames)
+        l_frames = np.stack(list(l_frames))
 
         label = list(map(self.vocab, sample["annotation"]))
 
         sample.update(
-            video=frames,
+            f_frames=f_frames,
+            l_frames=l_frames,
             label=label,
         )
 
@@ -127,8 +132,10 @@ class VideoTextDataset(Dataset):
         collated = defaultdict_with_warning(list)
 
         for sample in batch:
-            # SINGLE INPUT
-            collated["video"].append(torch.tensor(sample["video"]).float())
+            # MULTIPLE INPUTS
+            collated["f_frames"].append(torch.tensor(sample["f_frames"]).float())
+            collated["l_frames"].append(torch.tensor(sample["l_frames"]).float())
+
             collated["label"].append(torch.tensor(sample["label"]).long())
             # using text is deprecated, label is prefered
             collated["text"].append(torch.tensor(sample["label"]).long())

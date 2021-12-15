@@ -9,8 +9,8 @@ class Corpus:
     def load_data_frame(self, split):
         raise NotImplementedError
 
-    def create_vocab(self):
-        df = self.load_data_frame("train")
+    def create_vocab(self, split):
+        df = self.load_data_frame(split)
         sentences = df["annotation"].to_list()
         return LookupTable(
             [gloss for sentence in sentences for gloss in sentence],
@@ -19,8 +19,8 @@ class Corpus:
 
 class SSLCorpus(Corpus):
 
-    def __init__(self, root):
-        super().__init__(root)
+    # def __init__(self, root):
+    #     super().__init__(root)
 
     def load_data_frame(self, split, aligned_annotation=False):
         """Load corpus."""
@@ -35,9 +35,3 @@ class SSLCorpus(Corpus):
         df["folder"] = split + "/" + df["folder"]
 
         return df
-
-    # SINGLE INPUT
-    def get_frames(self, sample):
-        frames = (self.root / "features" / "ff" / sample["folder"]).glob("*.jpg")
-        frames = (self.root / "features" / "lip" / sample["folder"]).glob("*.jpg")
-        return sorted(frames)

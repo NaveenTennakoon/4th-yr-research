@@ -1,19 +1,38 @@
 import cv2
+import torch
 import time
 import numpy as np
+import logging
+import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+logging.getLogger('tensorflow').setLevel(logging.FATAL)
 
 from flask import Flask, render_template, Response, jsonify, request
+from torchvision import transforms
 
-from video_utils import show_text, get_byte_image
+from video_utils import show_text, get_byte_image, load_lip_detector, bodyFrames2LipFrames
 from camera import VideoStream
-from ..ISLR.lip_extractor import bodyFrames2LipFrames
+from model_utils import load_model
+from dataset.corpus import SSLCorpus
 
 app = Flask(__name__)
 
+# camera and recorder variables
 video_camera = None
 global_frame = None
 status = 'loading'
 timer = 0
+
+# dataset variables
+corpus = SSLCorpus('../CSLR/data/')
+# data_frame = corpus.load_data_frame("test")
+vocab = corpus.create_vocab("test")
+transformer = transforms.Compose([
+    transforms.Resize([256,256]),
+    transforms.CenterCrop([224,224]),
+    transforms.ToTensor(),
+])
 
 @app.route('/')
 def index():
@@ -44,9 +63,15 @@ def video_stream():
     global global_frame
     global status
     global timer
+    global vocab
 
     if video_camera == None:
         video_camera = VideoStream(src=0).start()
+
+    pnet, rnet, onet = load_lip_detector()
+    model = load_model()
+    model.to("cuda")
+    model.eval()
 
     status = 'waiting'
 
@@ -116,13 +141,21 @@ def video_stream():
                     break
 
         if status == 'translating':
-            # SIGN TRANSLATION LOGIC HERE
-            lip_frames = bodyFrames2LipFrames(captured_frames)
-            print(captured_frames.shape, lip_frames.shape)
-            # for frame in range(captured_frames.shape[0]):
-                # cv2.imshow("./frames", captured_frames[frame,:,:,:])
-                # cv2.imwrite("./frames/frame%04d.jpg" % frame, captured_frames[frame,:,:,:])
-                # cv2.waitKey(0)
+            start = time.time()
+            lip_frames = bodyFrames2LipFrames(captured_frames, pnet, rnet, onet)
+
+            if type(lip_frames) != type(None):
+                # preprocess the images
+                frames = list(transformer(captured_frames))
+                # get prediction from model
+                with torch.no_grad():
+                    prob = [lpi.exp().cpu().numpy() for lpi in model(frames)]    
+                hyp = model.decode(prob, 10, 0.01, False, 8)
+                hyp = [" ".join([vocab[i] for i in hi]) for hi in hyp]
+                print(hyp)
+
+                elapsed = time.time() - start
+                print("\nTime taken for prediction: %.1f sec" % elapsed)
             status = 'waiting'
 
 @app.route('/video_viewer')

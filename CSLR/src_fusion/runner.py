@@ -9,7 +9,7 @@ import imageio
 from torchzq.parsing import boolean, custom
 from pathlib import Path
 from einops import rearrange
-from dataset_utils import SSLVideoTextDataset
+from dataset_utils.__init__fusion import SSLVideoTextDataset
 from jiwer import ReduceToSingleSentence, compute_measures
 
 from .fusion_model_2 import Model
@@ -110,13 +110,6 @@ class Runner(torchzq.LegacyRunner):
     def prepare_batch(self, batch):
         args = self.args
 
-        # SINGLE INPUT
-        # x, y = batch["video"], batch["label"]
-        # for i in range(len(x)):
-        #     x[i] = x[i].to(args.device)
-        #     y[i] = y[i].to(args.device)
-        # batch["video"] = x
-
         # MULTIPLE INPUTS
         x1, x2, y = batch["f_frames"], batch["l_frames"], batch["label"]
         for i in range(len(x1)):
@@ -131,9 +124,6 @@ class Runner(torchzq.LegacyRunner):
         return batch
 
     def compute_loss(self, batch):
-        # SINGLE INPUT
-        # return self.model.compute_loss(batch["video"], batch["label"])
-        # MULTIPLE INPUTS
         return self.model.compute_loss(batch["f_frames"], batch["l_frames"], batch["label"])
 
     @property
@@ -153,12 +143,6 @@ class Runner(torchzq.LegacyRunner):
             prob = np.load(prob_path, allow_pickle=True)["prob"]
         else:
             prob = []
-            
-            # SINGLE INPUT
-            # for batch in tqdm.tqdm(self.data_loader):
-            #     batch = self.prepare_batch(batch)
-            #     video = batch["video"]
-            #     prob += [lpi.exp().cpu().numpy() for lpi in self.model(video)]
 
             # MULTIPLE INPUTS
             for batch in tqdm.tqdm(self.data_loader):
