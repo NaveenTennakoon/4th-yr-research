@@ -1,7 +1,7 @@
 additional
 dataset utilities
+**/__pycache__
 
-ISLR/__pycache__
 ISLR/log
 ISLR/saved_models
 ISLR/models
@@ -11,10 +11,6 @@ ISLR/data/signs
 ISLR/data/slsl-22/lip
 ISLR/data/slsl-22/islsl-22
 
-CSLR/__pycache__
-CSLR/dataset_utils/__pycache__
-CSLR/src/*/__pycache__
-CSLR/src/__pycache__
 CSLR/data/features
 CSLR/logs
 CSLR/ckpt
@@ -23,5 +19,3 @@ CSLR/results
 CSLR/examples
 CSLR/tools
 CSLR/.python-version
-
-front-end-application/__pycache__
