@@ -132,8 +132,8 @@ if __name__ == '__main__':
     os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
     bodyFramesDir2lipFrameDir(
-        '../../data/slsl-22/features/ff/train',
-        '../../data/slsl-22/features/lip/train',
+        '../../data/slsl-22/features/ff/test-deaf',
+        '../../data/slsl-22/features/lip/test-deaf',
         minsize = 40,
         threshold = [ 0.6, 0.7, 0.7 ],
         factor = 0.709) 
