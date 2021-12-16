@@ -12,7 +12,7 @@ from einops import rearrange
 from dataset_utils import SSLVideoTextDataset
 from jiwer import ReduceToSingleSentence, compute_measures
 
-from .fusion_model_2 import Model
+from .model import Model
 
 
 class Runner(torchzq.LegacyRunner):
@@ -71,6 +71,8 @@ class Runner(torchzq.LegacyRunner):
             split = args.split
         if split == "validate":
             split = "test"
+        if split == "test":
+            split = "test-formal"
         return split
 
     def create_dataset(self):
@@ -111,30 +113,18 @@ class Runner(torchzq.LegacyRunner):
         args = self.args
 
         # SINGLE INPUT
-        # x, y = batch["video"], batch["label"]
-        # for i in range(len(x)):
-        #     x[i] = x[i].to(args.device)
-        #     y[i] = y[i].to(args.device)
-        # batch["video"] = x
-
-        # MULTIPLE INPUTS
-        x1, x2, y = batch["f_frames"], batch["l_frames"], batch["label"]
-        for i in range(len(x1)):
-            x1[i] = x1[i].to(args.device)
-            x2[i] = x2[i].to(args.device)
+        x, y = batch["video"], batch["label"]
+        for i in range(len(x)):
+            x[i] = x[i].to(args.device)
             y[i] = y[i].to(args.device)
-        batch["f_frames"] = x1
-        batch["l_frames"] = x2
-
+        batch["video"] = x
         batch["label"] = y
         self.batch = batch
         return batch
 
     def compute_loss(self, batch):
         # SINGLE INPUT
-        # return self.model.compute_loss(batch["video"], batch["label"])
-        # MULTIPLE INPUTS
-        return self.model.compute_loss(batch["f_frames"], batch["l_frames"], batch["label"])
+        return self.model.compute_loss(batch["video"], batch["label"])
 
     @property
     def result_dir(self):
@@ -155,17 +145,10 @@ class Runner(torchzq.LegacyRunner):
             prob = []
             
             # SINGLE INPUT
-            # for batch in tqdm.tqdm(self.data_loader):
-            #     batch = self.prepare_batch(batch)
-            #     video = batch["video"]
-            #     prob += [lpi.exp().cpu().numpy() for lpi in self.model(video)]
-
-            # MULTIPLE INPUTS
             for batch in tqdm.tqdm(self.data_loader):
                 batch = self.prepare_batch(batch)
-                f_frames = batch["f_frames"]
-                l_frames = batch["l_frames"]
-                prob += [lpi.exp().cpu().numpy() for lpi in self.model(f_frames, l_frames)]
+                video = batch["video"]
+                prob += [lpi.exp().cpu().numpy() for lpi in self.model(video)]
 
             np.savez_compressed(prob_path, prob=prob)
 
