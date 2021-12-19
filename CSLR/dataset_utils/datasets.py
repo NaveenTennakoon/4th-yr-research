@@ -56,29 +56,15 @@ class VideoTextDataset(Dataset):
 
         self.data_frame = self.corpus.load_data_frame(split)
         self.vocab = vocab or self.corpus.create_vocab()
-        self.ff_transform = transforms.Compose(
+        self.transform = transforms.Compose(
             [
                 transforms.Resize(base_size),
                 transforms.RandomCrop(crop_size)
                 if random_crop
                 else transforms.CenterCrop(crop_size),
-                # transforms.RandomHorizontalFlip(0.5)
-                # if random_flip
-                # else transforms.RandomHorizontalFlip(0),
-                # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
-                # if random_jitter
-                # else transforms.ColorJitter(),
-                transforms.ToTensor(),
-            ]
-        )
-        self.lf_transform = transforms.Compose(
-            [
-                # transforms.RandomHorizontalFlip(0.5)
-                # if random_flip
-                # else transforms.RandomHorizontalFlip(0),
-                # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
-                # if random_jitter
-                # else transforms.ColorJitter(),
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+                if random_jitter
+                else transforms.ColorJitter(),
                 transforms.ToTensor(),
             ]
         )
@@ -109,8 +95,7 @@ class VideoTextDataset(Dataset):
 
         frames = [frames[i] for i in indices]
         frames = map(Image.open, frames)
-        frames = map(self.ff_transform, frames)
-        frames = map(self.lf_transform, frames)
+        frames = map(self.transform, frames)
         frames = np.stack(list(frames))
 
         label = list(map(self.vocab, sample["annotation"]))

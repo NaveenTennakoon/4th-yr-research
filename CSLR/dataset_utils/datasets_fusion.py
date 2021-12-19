@@ -62,23 +62,17 @@ class VideoTextDataset(Dataset):
                 transforms.RandomCrop(crop_size)
                 if random_crop
                 else transforms.CenterCrop(crop_size),
-                # transforms.RandomHorizontalFlip(0.5)
-                # if random_flip
-                # else transforms.RandomHorizontalFlip(0),
-                # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
-                # if random_jitter
-                # else transforms.ColorJitter(),
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+                if random_jitter
+                else transforms.ColorJitter(),
                 transforms.ToTensor(),
             ]
         )
         self.lf_transform = transforms.Compose(
             [
-                # transforms.RandomHorizontalFlip(0.5)
-                # if random_flip
-                # else transforms.RandomHorizontalFlip(0),
-                # transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
-                # if random_jitter
-                # else transforms.ColorJitter(),
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+                if random_jitter
+                else transforms.ColorJitter(),
                 transforms.ToTensor(),
             ]
         )
