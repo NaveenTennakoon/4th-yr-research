@@ -12,7 +12,7 @@ from einops import rearrange
 from dataset_utils.__init__fusion import SSLVideoTextDataset
 from jiwer import ReduceToSingleSentence, compute_measures
 
-from .fusion_model_2 import Model
+from .fusion_model_6 import Model
 
 
 class Runner(torchzq.LegacyRunner):
@@ -70,7 +70,9 @@ class Runner(torchzq.LegacyRunner):
         else:
             split = args.split
         if split == "validate":
-            split = "test"
+            split = "test-formal"
+        if split == "test":
+            split = "test-formal"
         return split
 
     def create_dataset(self):
@@ -149,7 +151,8 @@ class Runner(torchzq.LegacyRunner):
                 batch = self.prepare_batch(batch)
                 f_frames = batch["f_frames"]
                 l_frames = batch["l_frames"]
-                prob += [lpi.exp().cpu().numpy() for lpi in self.model(f_frames, l_frames)]
+                lpi, _, _ = self.model(f_frames, l_frames)
+                prob += [lpi.exp().cpu().numpy() for lpi in lpi]
 
             np.savez_compressed(prob_path, prob=prob)
 

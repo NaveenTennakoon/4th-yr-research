@@ -70,7 +70,7 @@ class Runner(torchzq.LegacyRunner):
         else:
             split = args.split
         if split == "validate":
-            split = "test"
+            split = "test-formal"
         if split == "test":
             split = "test-formal"
         return split
