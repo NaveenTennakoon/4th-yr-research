@@ -12,6 +12,7 @@ ISLR/data/slsl-22/lip
 ISLR/data/slsl-22/islsl-22
 
 CSLR/data/features
+CSLR/runlist.txt
 CSLR/logs
 CSLR/ckpt
 CSLR/*sw*
