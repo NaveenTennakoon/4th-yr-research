@@ -19,3 +19,5 @@ CSLR/results
 CSLR/examples
 CSLR/tools
 CSLR/.python-version
+
+front-end-application/model/*/ckpt.pth
