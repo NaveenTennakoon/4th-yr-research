@@ -1,38 +1,34 @@
-import cv2
-import torch
-import time
-import numpy as np
 import logging
 import os
 
+# Set tensorflow logging to only fatal logs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logging.getLogger('tensorflow').setLevel(logging.FATAL)
 
+import cv2
+import time
+import numpy as np
+
 from flask import Flask, render_template, Response, jsonify, request
-from torchvision import transforms
+from turbo_flask import Turbo
 
-from video_utils import show_text, get_byte_image, load_lip_detector, bodyFrames2LipFrames
+from video_utils import get_byte_image
 from camera import VideoStream
-from model_utils import load_model
-from dataset.corpus import SSLCorpus
+from model_utils import PyModel
 
+# Start a turbo flask app
 app = Flask(__name__)
+turbo = Turbo(app)
 
-# camera and recorder variables
+# global variables
+status = "stopping"
 video_camera = None
-global_frame = None
-status = 'loading'
-timer = 0
-
-# dataset variables
-corpus = SSLCorpus('../CSLR/data/')
-# data_frame = corpus.load_data_frame("test")
-vocab = corpus.create_vocab("test")
-transformer = transforms.Compose([
-    transforms.Resize([256,256]),
-    transforms.CenterCrop([224,224]),
-    transforms.ToTensor(),
-])
+prediction = "පරිවර්තනය මෙතනින් දිස්වේ"
+init_time = time.time() # Note: comment/remove after calculating avg model load time
+model = PyModel()
+model_load_time = time.time() - init_time  # Note: comment/remove after calculating avg model load time
+timer = counter = 3
+status_text = "කරුණාකර මොහොතක් ඉන්න"
 
 @app.route('/')
 def index():
@@ -42,7 +38,6 @@ def index():
 def record_status():
     global video_camera 
     global status
-    global timer
 
     if video_camera == None:
         video_camera = VideoStream(src=0)
@@ -51,112 +46,156 @@ def record_status():
     record = json['record']
 
     if record == 'true':
-        timer = 3
         status = 'starting'
         return jsonify(result='started')
-    else:
-        status = 'stopping'
-        return jsonify(result='stopped')
 
 def video_stream():
     global video_camera 
-    global global_frame
+    global prediction
+    global model
     global status
-    global timer
     global vocab
+    global timer
+    global status_text
+    global counter
 
     if video_camera == None:
-        video_camera = VideoStream(src=0).start()
-
-    pnet, rnet, onet = load_lip_detector()
-    model = load_model()
-    model.to("cuda")
-    model.eval()
-
-    status = 'waiting'
-
+        video_camera = VideoStream(src=0)
+    
     while True:
-        if status == 'waiting':
-            while True:
-                # grab the frame from the threaded video file stream
-                frame = video_camera.read()
+        video_camera.start()
+        # change status text
+        status_text = "පරිවර්තනය ආරම්භ කළ හැක"
+        update_status_text()
+        update_button()
+        while True:
+            # grab and show the frame from the threaded video file stream
+            frame = video_camera.read()
+            frame = cv2.flip(frame, 1)
+            frame = get_byte_image(frame)
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+        
+            # stop when starting to record
+            if status == 'starting':
+                break
 
-                # add text, show the (mirrored) frame
-                frame = show_text(cv2.flip(frame, 1), "green", "Waiting to start")
-                frame = get_byte_image(frame)
-                global_frame = frame
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
-            
-                # stop when starting to record
-                if status == 'starting':
-                    break
+        target_time = time.time() + timer
+        prediction = "පරිවර්තනය මෙතනින් දිස්වේ"
+        update_prediction()
 
-        if status == 'starting':
-            target_time = time.time() + timer
-            while True:
-                # grab the frame from the threaded video file stream
-                frame = video_camera.read()
+        while True:
+            # change status text
+            countdown = target_time - time.time()
+            status_text = "පටිගත කිරීම තත්පර " + str(int(countdown)+1) + " කින් ආරම්භ වේ"
+            update_status_text()
+            counter = int(countdown) + 1
+            update_counter()
 
-                countdown = target_time - time.time()
-                text = "Recording starts in " + str(int(countdown)+1) + " sec"
+            # grab and show the frame from the threaded video file stream
+            frame = video_camera.read()
+            frame = cv2.flip(frame, 1)
+            frame = get_byte_image(frame)
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+        
+            # stop after countdown
+            if countdown <= 0.0:
+                break
 
-                # add text, show the (mirrored) frame
-                frame = show_text(cv2.flip(frame, 1), "orange", text)
-                frame = get_byte_image(frame)
-                global_frame = frame
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
-            
-                # stop after countdown
-                if timer > 0 and countdown <= 0.0:
-                    status = 'recording'
-                    break
+        # start recorder and set appropriate instance variables
+        start = time.time() # Note: comment/remove after calculating avg prediction times
+        time_elapsed = prev_time = 0
+        video_camera.start_recording()
+        status_text = "පටිගත වෙමින් පවතියි"
+        update_status_text()
+        update_to_empty_counter()
+        current_frame = previous_frame = video_camera.read()
 
-        if status == 'recording':
-            start = time.time()
-            video_camera.start_recording()
-            # loop over frames from the video file stream
-            while True:
-                # grab the frame from the threaded video file stream
-                frame = video_camera.read()
-                frame = cv2.flip(frame, 1)
+        # loop over frames from the video file stream
+        while True:
+            frame = cv2.flip(current_frame, 1)
+            frame = get_byte_image(frame)
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
-                time_elapsed = time.time() - start
-                text = "Recording " + str(int(time_elapsed)+1) + " sec"
+            # calculate frame difference each passign second after 2 sec of recording
+            if int(time_elapsed) > 2 and int(time_elapsed) > int(prev_time):
+                current_frame_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
+                previous_frame_gray = cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)
+                frame_diff = cv2.absdiff(current_frame_gray,previous_frame_gray)
+                _, bw = cv2.threshold(frame_diff, 127, 255, cv2.THRESH_BINARY)
+                # stop recording if frame_diff is very low
+                if bw.mean() < 0.1:
+                    status = "stopping"
+                previous_frame = current_frame.copy()
+                prev_time = time_elapsed
 
-                # add text, show the frame
-                frame = show_text(frame, "red", text)
-                frame = get_byte_image(frame)
-                global_frame = frame
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+            # stop recording indefinitely after 10 sec
+            if int(time_elapsed) == 10:
+                status = "stopping"
 
-                # stop after nTimeDuration sec
-                if status == 'stopping':
-                    captured_frames = np.array(video_camera.stop())
-                    print("\nCaptured video: %.1f sec, %s, %.1f fps" % \
-                        (time_elapsed, str(captured_frames.shape), captured_frames.shape[0]/time_elapsed))
-                    status = 'translating'
-                    break
+            # stop the recording
+            if status == 'stopping':
+                captured_frames = np.array(video_camera.stop_recording())
+                print("\nCaptured video: %.1f sec, %s, %.1f fps" % \
+                    (time_elapsed, str(captured_frames.shape), captured_frames.shape[0]/time_elapsed)) # Note: comment/remove after calculating avg prediction times
+                break
 
-        if status == 'translating':
-            start = time.time()
-            lip_frames = bodyFrames2LipFrames(captured_frames, pnet, rnet, onet)
+            current_frame = video_camera.read()
+            time_elapsed = time.time() - start # Note: comment/remove after calculating avg prediction times
 
-            if type(lip_frames) != type(None):
-                # preprocess the images
-                frames = list(transformer(captured_frames))
-                # get prediction from model
-                with torch.no_grad():
-                    prob = [lpi.exp().cpu().numpy() for lpi in model(frames)]    
-                hyp = model.decode(prob, 10, 0.01, False, 8)
-                hyp = [" ".join([vocab[i] for i in hi]) for hi in hyp]
-                print(hyp)
+        # change status text
+        status_text = "පරිවර්තනය වෙමින් පවතියි... කරුණාකර මොහොතක් ඉන්න"
+        update_status_text()
 
-                elapsed = time.time() - start
-                print("\nTime taken for prediction: %.1f sec" % elapsed)
-            status = 'waiting'
+        # get prediction
+        results = model.predict(captured_frames)
+
+        if type(results['prediction']) != type(None):
+            print("\nTime taken for lip frame extraction: %.1f sec" % results['lip_extraction_time']) # Note: comment/remove after calculating avg prediction times
+            let_psv = results['lip_extraction_time']/time_elapsed
+            print("Time taken for lip frame extraction (per sec. of input video): %.1f sec" % let_psv) # Note: comment/remove after calculating avg prediction times
+            print("\nTime taken for frame processing and prediction: %.1f sec" % results['prediction_time']) # Note: comment/remove after calculating avg prediction times
+            pt_psv = results['prediction_time']/time_elapsed
+            print("Time taken for frame processing and prediction (per sec. of input video): %.1f sec" % pt_psv) # Note: comment/remove after calculating avg prediction times
+            prediction = results['prediction']
+        elif results['prediction'] == '':
+            prediction = "පරිවර්තනය අසාර්ථකයි.. නැවත උත්සාහ කරන්න"
+        else:
+            prediction = "පරිවර්තනයේදී දෝශයක් ඇතිවිය.. නැවත උත්සාහ කරන්න"
+        update_prediction()
+
+@app.context_processor
+def inject_load():
+    global prediction
+    global status_text
+    global counter
+    return { 
+        'prediction' : prediction,
+        'status_text' : status_text,
+        'counter' : counter
+    }
+
+def update_prediction():
+    with app.app_context():
+        turbo.push(turbo.replace(render_template('prediction.html'), 'prediction'))
+
+def update_status_text():
+    with app.app_context():
+        turbo.push(turbo.replace(render_template('status.html'), 'status'))
+
+def update_button():
+    with app.app_context():
+        turbo.push(turbo.replace(render_template('predict_button.html'), 'predict_button'))
+
+def update_counter():
+    with app.app_context():
+        turbo.push(turbo.replace(render_template('counter.html'), 'counter'))
+
+def update_to_empty_counter():
+    with app.app_context():
+        turbo.push(turbo.replace(render_template('empty_counter.html'), 'counter'))
 
 @app.route('/video_viewer')
 def video_viewer():

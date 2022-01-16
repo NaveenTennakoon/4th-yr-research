@@ -29,8 +29,8 @@ class SSLCorpus(Corpus):
 
         df_annotations = pd.read_csv(annotations)
         df_labels = pd.read_csv(gloss_classes)
-        df = pd.merge(df_annotations, df_labels[['class','gloss_labels']], on='class', how='inner')
-        df.rename(columns = {'gloss_labels':'annotation'}, inplace = True)
+        df = pd.merge(df_annotations, df_labels[['class','sinhala_gloss_labels']], on='class', how='inner')
+        df.rename(columns = {'sinhala_gloss_labels':'annotation'}, inplace = True)
         df["annotation"] = df["annotation"].str.split(',')
         df["folder"] = split + "/" + df["folder"]
 

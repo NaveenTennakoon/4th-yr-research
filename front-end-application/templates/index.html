@@ -1,17 +1,34 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Streaming Video Recorder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">  
+  <title>Sinhala Sign Language Translator - සිංහල සංඥා භාෂා පරිවර්තකය</title>
+  <link rel="icon" type="image/x-icon" href="{{url_for('.static', filename='logo.png')}}">
+  {{ turbo() }}
 </head>
-<body class="text-center">
-  <h1>Sign Language Translator</h1>
-  <div id="recorder">
-    <button id="predict">Predict</button>
-    <button id="stop">Stop</button>
-    <!-- <a id="download"></a> -->
-    <script type="text/javascript" src="{{ url_for('static', filename='recorder.js') }}"></script>      
+<link rel="stylesheet" type="text/css" href="{{url_for('.static', filename='bootstrap.min.css')}}">
+<body>
+  <div class="container-fluid text-center">
+    <div class="row justify-content-md-center py-2 border-bottom">
+      <img id="video" src="{{url_for('.static', filename='logo.png')}}" width="5%" height="5%">
+      <h2 class="m-4"><strong>සිංහල සංඥා භාෂා පරිවර්තකය</strong></h2>
+    </div>
+    {% include "status.html" %}
+    <div class="row justify-content-md-center">
+      <div class="col-md-3">
+        {% include "empty_counter.html" %}
+      </div>
+      <img id="video" src="{{ url_for('video_viewer') }}" width="640px" height="360px" class="col-md-auto bg-dark">
+      <div class="col-md-3">Instructions</div>
+    </div>
+    <div id="recorder" class="row justify-content-md-center mt-2">
+      <div class="col-md-2">
+        <button id="predict_button" type="button" class="btn btn-block btn-outline-success my-2 py-2" onclick="predict(this);" disabled>ආරම්භ කරන්න</button>
+      </div>
+    </div>
+    {% include "prediction.html" %}
   </div>
-  <img id="video" src="{{ url_for('video_viewer') }}">
 </body>
+<script type="text/javascript" src="{{ url_for('static', filename='recorder.js') }}"></script>
 </html>

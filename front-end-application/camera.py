@@ -1,5 +1,6 @@
-from threading import Thread
 import cv2
+
+from threading import Thread
 
 class VideoStream:
     def __init__(self, src=0):
@@ -17,6 +18,7 @@ class VideoStream:
 
     def start(self):
 		# start the thread to read frames from the video stream
+        self.stopped = False
         Thread(target=self.update, args=()).start()
         return self
 
@@ -41,8 +43,9 @@ class VideoStream:
         self.captured_frames = []
         self.record = True
 
-    def stop(self):
-        # indicate that recording should be stopped
+    def stop_recording(self):
+        # indicate that recording and the thread should be stopped
         self.record = False
-
+        self.stopped = True
+        
         return self.captured_frames
