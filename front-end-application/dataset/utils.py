@@ -1,5 +1,5 @@
 class LookupTable:
-    def __init__(self, words=None, symbols=None, allow_unk=False):
+    def __init__(self, words=None, symbols=None, allow_unk=False, mapping=None):
         """
         Args:
             words: all the words, unsorted, allows duplications
@@ -11,6 +11,8 @@ class LookupTable:
 
         if symbols is None:
             symbols = sorted(set(words))
+            if mapping is not None:
+                symbols = [mapping['sinhala_annotation'][mapping['annotation'] == symbol].iloc[0] for symbol in symbols]
 
         assert len(symbols) == len(set(symbols)), "Symbols contain duplications."
 

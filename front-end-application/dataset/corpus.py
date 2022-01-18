@@ -5,6 +5,7 @@ from .utils import LookupTable
 class Corpus:
     def __init__(self, root):
         self.root = Path(root)
+        self.mapping = pd.read_csv(self.root / "annotations" / "gloss_class.csv")
 
     def load_data_frame(self, split):
         raise NotImplementedError
@@ -15,6 +16,7 @@ class Corpus:
         return LookupTable(
             [gloss for sentence in sentences for gloss in sentence],
             allow_unk=True,
+            mapping=self.mapping
         )
 
 class SSLCorpus(Corpus):
@@ -29,8 +31,8 @@ class SSLCorpus(Corpus):
 
         df_annotations = pd.read_csv(annotations)
         df_labels = pd.read_csv(gloss_classes)
-        df = pd.merge(df_annotations, df_labels[['class','sinhala_gloss_labels']], on='class', how='inner')
-        df.rename(columns = {'sinhala_gloss_labels':'annotation'}, inplace = True)
+        df = pd.merge(df_annotations, df_labels[['class','gloss_labels']], on='class', how='inner')
+        df.rename(columns = {'gloss_labels':'annotation'}, inplace = True)
         df["annotation"] = df["annotation"].str.split(',')
         df["folder"] = split + "/" + df["folder"]
 
