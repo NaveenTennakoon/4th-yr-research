@@ -138,6 +138,7 @@ def video_stream():
             # stop the recording
             if status == 'stopping':
                 captured_frames = np.array(video_camera.stop_recording())
+                print(captured_frames.shape)
                 print("\nCaptured video: %.1f sec, %s, %.1f fps" % \
                     (time_elapsed, str(captured_frames.shape), captured_frames.shape[0]/time_elapsed)) # Note: comment/remove after calculating avg prediction times
                 break
@@ -148,6 +149,19 @@ def video_stream():
         # change status text
         status_text = "පරිවර්තනය වෙමින් පවතියි... කරුණාකර මොහොතක් ඉන්න"
         update_status_text()
+
+        # DEBUG CODE TO USE FILE FRAMES AS INPUT -------------------- 
+
+        # liFiles = sorted(glob.glob("frames/*.jpg"))
+        # liFrames = []
+        # # loop through frames
+        # for frame in liFiles:
+        #     arFrame = cv2.imread(frame)
+        #     liFrames.append(arFrame)
+
+        # captured_frames = np.array(liFrames)
+
+        # END OF DEBUG CODE -----------------------------------------
 
         # get prediction
         results = model.predict(captured_frames)
