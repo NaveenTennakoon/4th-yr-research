@@ -6,6 +6,11 @@
   <title>Sinhala Sign Language Translator - සිංහල සංඥා භාෂා පරිවර්තකය</title>
   <link rel="icon" type="image/x-icon" href="{{url_for('.static', filename='logo.png')}}">
   {{ turbo() }}
+  <style>
+    ol > li::marker {
+      font-weight: bold;
+    }
+  </style>
 </head>
 <link rel="stylesheet" type="text/css" href="{{url_for('.static', filename='bootstrap.min.css')}}">
 <body>
@@ -20,7 +25,15 @@
         {% include "empty_counter.html" %}
       </div>
       <img id="video" src="{{ url_for('video_viewer') }}" width="640px" height="360px" class="col-md-auto bg-dark">
-      <div class="col-md-3">Instructions</div>
+      <div class="col-md-3">
+        <h4 class="m-4"><strong><u>උපදෙස්</u></strong></h4>
+        <ol class="text-left">
+          <li class="my-3">සංඥාව කරන පුද්ගලයා සීරුවෙන් කැමරාව ඉදිරියෙන් සිටගන්න (අත් දෙකෙන් උඩත් හිසෙන් පහලත් කැමරාවට හසුවන ලෙස)</li>
+          <li class="my-3">"ආරම්භ කරන්න" බොත්තම ඔබා, වමින් දිස්වන ගනන් කිරීම 0 වනවාත් සමගම සංඥා කිරීම ආරම්භ කරන්න</li>
+          <li class="my-3">සංඥාව අවසන් වූ විගස නැවත සීරුවෙන් සිටගන්න</li>
+          <li class="my-3">සංඥාව පරිවර්තනය වූ පසු පහලින් දිස්වේ</li>
+        </ol>
+      </div>
     </div>
     <div id="recorder" class="row justify-content-md-center mt-2">
       <div class="col-md-2">
