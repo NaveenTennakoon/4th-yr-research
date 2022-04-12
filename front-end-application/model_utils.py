@@ -29,7 +29,7 @@ def load_model():
             break
         except Exception as e:
             print(e)
-            print("Fail to load model, reloading ...")
+            print("Failed to load model, reloading ...")
             os.remove(path)
     return model
 
@@ -52,8 +52,8 @@ class PyModel:
         self.p_drop = 0.75
         # prediction results
         self.prediction = None
-        self.lip_extraction_time = None # Note: comment/remove after calculating avg prediction times
-        self.prediction_time = None # Note: comment/remove after calculating avg prediction times
+        # self.lip_extraction_time = None # Note: comment/remove after calculating avg prediction times
+        # self.prediction_time = None # Note: comment/remove after calculating avg prediction times
 
     def sample_indices(self, n):
         p_kept = 1 - self.p_drop
@@ -64,12 +64,12 @@ class PyModel:
         return indices
     
     def predict(self, captured_frames):
-        start = time.time() # Note: comment/remove after calculating avg prediction times
+        # start = time.time() # Note: comment/remove after calculating avg prediction times
 
         # extract lip frames
         lip_frames = bodyFrames2LipFrames(captured_frames, self.pnet, self.rnet, self.onet)
-        lip_extraction_time = time.time() - start # Note: comment/remove after calculating avg prediction times
-        self.lip_extraction_time = lip_extraction_time # Note: comment/remove after calculating avg prediction times
+        # lip_extraction_time = time.time() - start # Note: comment/remove after calculating avg prediction times
+        # self.lip_extraction_time = lip_extraction_time # Note: comment/remove after calculating avg prediction times
 
         if type(lip_frames) != type(None):
             # preprocess the images
@@ -104,12 +104,12 @@ class PyModel:
             hyp = " ".join([self.vocab[i] for i in hyp])
             self.prediction = hyp
             # get prediction time
-            prediction_time = time.time() - start - lip_extraction_time # Note: comment/remove after calculating avg prediction times
-            self.prediction_time = prediction_time # Note: comment/remove after calculating avg prediction times
+            # prediction_time = time.time() - start - lip_extraction_time # Note: comment/remove after calculating avg prediction times
+            # self.prediction_time = prediction_time # Note: comment/remove after calculating avg prediction times
         
         results = {
             "prediction": self.prediction,
-            "lip_extraction_time": self.lip_extraction_time, # Note: comment/remove after calculating avg prediction times
-            "prediction_time": self.prediction_time # Note: comment/remove after calculating avg prediction times
+            # "lip_extraction_time": self.lip_extraction_time, # Note: comment/remove after calculating avg prediction times
+            # "prediction_time": self.prediction_time # Note: comment/remove after calculating avg prediction times
         }
         return results

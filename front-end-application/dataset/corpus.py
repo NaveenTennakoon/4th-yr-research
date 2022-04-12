@@ -7,9 +7,6 @@ class Corpus:
         self.root = Path(root)
         self.mapping = pd.read_csv(self.root / "annotations" / "gloss_class.csv")
 
-    def load_data_frame(self, split):
-        raise NotImplementedError
-
     def create_vocab(self, split):
         df = self.load_data_frame(split)
         sentences = df["annotation"].to_list()
@@ -21,10 +18,7 @@ class Corpus:
 
 class SSLCorpus(Corpus):
 
-    # def __init__(self, root):
-    #     super().__init__(root)
-
-    def load_data_frame(self, split, aligned_annotation=False):
+    def load_data_frame(self, split):
         """Load corpus."""
         annotations = self.root / "annotations" / f"{split}.csv"
         gloss_classes = self.root / "annotations" / "class.csv"

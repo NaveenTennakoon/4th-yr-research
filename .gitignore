@@ -21,3 +21,5 @@ CSLR/tools
 CSLR/.python-version
 
 front-end-application/model/*/ckpt.pth
+front-end-application/frames
+front-end-application-v1

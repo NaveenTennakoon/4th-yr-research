@@ -24,10 +24,11 @@ turbo = Turbo(app)
 status = "stopping"
 video_camera = None
 prediction = "පරිවර්තනය මෙතනින් දිස්වේ"
-init_time = time.time() # Note: comment/remove after calculating avg model load time
+# init_time = time.time() # Note: comment/remove after calculating avg model load time
 model = PyModel()
-model_load_time = time.time() - init_time  # Note: comment/remove after calculating avg model load time
-timer = counter = 3
+# model_load_time = time.time() - init_time  # Note: comment/remove after calculating avg model load time
+# print("Time taken for loading the model: %.1f sec" % model_load_time) # Note: comment/remove after calculating avg model load time
+timer = counter = 5
 status_text = "කරුණාකර මොහොතක් ඉන්න"
 
 @app.route('/')
@@ -104,7 +105,7 @@ def video_stream():
                 break
 
         # start recorder and set appropriate instance variables
-        start = time.time() # Note: comment/remove after calculating avg prediction times
+        start = time.time()
         time_elapsed = prev_time = 0
         video_camera.start_recording()
         status_text = "පටිගත වෙමින් පවතියි"
@@ -119,32 +120,32 @@ def video_stream():
             yield (b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
-            # calculate frame difference each passign second after 2 sec of recording
+            # calculate frame difference each passing second after 2 sec of recording
             if int(time_elapsed) > 2 and int(time_elapsed) > int(prev_time):
                 current_frame_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
                 previous_frame_gray = cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)
                 frame_diff = cv2.absdiff(current_frame_gray,previous_frame_gray)
                 _, bw = cv2.threshold(frame_diff, 127, 255, cv2.THRESH_BINARY)
                 # stop recording if frame_diff is very low
-                if bw.mean() < 0.1:
+                if bw.mean() < 0.01:
                     status = "stopping"
                 previous_frame = current_frame.copy()
                 prev_time = time_elapsed
 
             # stop recording indefinitely after 10 sec
-            if int(time_elapsed) == 10:
+            if int(time_elapsed) == 8:
                 status = "stopping"
 
             # stop the recording
             if status == 'stopping':
                 captured_frames = np.array(video_camera.stop_recording())
                 print(captured_frames.shape)
-                print("\nCaptured video: %.1f sec, %s, %.1f fps" % \
-                    (time_elapsed, str(captured_frames.shape), captured_frames.shape[0]/time_elapsed)) # Note: comment/remove after calculating avg prediction times
+                # print("\nCaptured video: %.1f sec, %s, %.1f fps" % \
+                #     (time_elapsed, str(captured_frames.shape), captured_frames.shape[0]/time_elapsed)) # Note: comment/remove after calculating avg prediction times
                 break
 
             current_frame = video_camera.read()
-            time_elapsed = time.time() - start # Note: comment/remove after calculating avg prediction times
+            time_elapsed = time.time() - start
 
         # change status text
         status_text = "පරිවර්තනය වෙමින් පවතියි... කරුණාකර මොහොතක් ඉන්න"
@@ -167,12 +168,17 @@ def video_stream():
         results = model.predict(captured_frames)
 
         if type(results['prediction']) != type(None):
-            print("\nTime taken for lip frame extraction: %.1f sec" % results['lip_extraction_time']) # Note: comment/remove after calculating avg prediction times
-            let_psv = results['lip_extraction_time']/time_elapsed
-            print("Time taken for lip frame extraction (per sec. of input video): %.1f sec" % let_psv) # Note: comment/remove after calculating avg prediction times
-            print("\nTime taken for frame processing and prediction: %.1f sec" % results['prediction_time']) # Note: comment/remove after calculating avg prediction times
-            pt_psv = results['prediction_time']/time_elapsed
-            print("Time taken for frame processing and prediction (per sec. of input video): %.1f sec" % pt_psv) # Note: comment/remove after calculating avg prediction times
+            # Note: comment/remove after calculating avg prediction times -------------------------------------------
+
+            # print("\nTime taken for lip frame extraction: %.1f sec" % results['lip_extraction_time'])
+            # let_psv = results['lip_extraction_time']/time_elapsed
+            # print("Time taken for lip frame extraction (per sec. of input video): %.1f sec" % let_psv)
+            # print("\nTime taken for frame processing and prediction: %.1f sec" % results['prediction_time'])
+            # pt_psv = results['prediction_time']/time_elapsed
+            # print("Time taken for frame processing and prediction (per sec. of input video): %.1f sec" % pt_psv)
+
+            # End Note ----------------------------------------------------------------------------------------------
+
             prediction = results['prediction']
         elif results['prediction'] == '':
             prediction = "පරිවර්තනය අසාර්ථකයි.. නැවත උත්සාහ කරන්න"
@@ -218,3 +224,7 @@ def video_viewer():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', threaded=True)
+
+# AVG MODEL LOAD TIME = 3.12s
+# AVG LIP EXT TIME = 0.66s per sec of video
+# AVG TIME FOR PREPROCESSING AND PREDICTION = 0.2s per sec of video
