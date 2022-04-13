@@ -27,12 +27,16 @@
       <img id="video" src="{{ url_for('video_viewer') }}" width="640px" height="360px" class="col-md-auto bg-dark">
       <div class="col-md-3">
         <h4 class="m-4"><strong><u>උපදෙස්</u></strong></h4>
-        <ol class="text-left">
+        <video id="instructions" width="320" muted>
+          <source src="{{url_for('.static', filename='1.mp4')}}" type="video/mp4">
+        </video>
+        <button id="instr_button" type="button" class="btn btn-outline-primary py-2" style="width:320px" onclick="play_instr(this)">පෙන්වන්න​​</button> 
+        <!-- <ol class="text-left">
           <li class="my-3">සංඥාව කරන පුද්ගලයා සීරුවෙන් කැමරාව ඉදිරියෙන් සිටගන්න (අත් දෙකෙන් උඩත් හිසෙන් පහලත් කැමරාවට හසුවන ලෙස)</li>
           <li class="my-3">"ආරම්භ කරන්න" බොත්තම ඔබා, වමින් දිස්වන ගනන් කිරීම 0 වනවාත් සමගම සංඥා කිරීම ආරම්භ කරන්න</li>
           <li class="my-3">සංඥාව අවසන් වූ විගස නැවත සීරුවෙන් සිටගන්න</li>
           <li class="my-3">සංඥාව පරිවර්තනය වූ පසු පහලින් දිස්වේ</li>
-        </ol>
+        </ol> -->
       </div>
     </div>
     <div id="recorder" class="row justify-content-md-center mt-2">
@@ -43,5 +47,5 @@
     {% include "prediction.html" %}
   </div>
 </body>
-<script type="text/javascript" src="{{ url_for('static', filename='recorder.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='server.js') }}"></script>
 </html>
