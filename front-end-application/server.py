@@ -139,7 +139,7 @@ def video_stream():
             # stop the recording
             if status == 'stopping':
                 captured_frames = np.array(video_camera.stop_recording())
-                print(captured_frames.shape)
+                # print("frames captured: ",captured_frames.shape)
                 # print("\nCaptured video: %.1f sec, %s, %.1f fps" % \
                 #     (time_elapsed, str(captured_frames.shape), captured_frames.shape[0]/time_elapsed)) # Note: comment/remove after calculating avg prediction times
                 break

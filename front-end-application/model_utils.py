@@ -91,10 +91,10 @@ class PyModel:
             l_frames = list(torch.unsqueeze(l_frames, dim=0))
 
             os.makedirs('./frames/', exist_ok=True)
-            print(f_frames_np.shape, l_frames_np.shape)
-            for nFrame in range(f_frames_np.shape[0]):
-                cv2.imwrite('./frames/' + "/ff_frame%04d.jpg" % nFrame, f_frames_np[nFrame,...])
-                cv2.imwrite('./frames/' + "/lf_frame%04d.jpg" % nFrame, l_frames_np[nFrame,...])
+            # print("full frames and lip frames: ",f_frames_np.shape, l_frames_np.shape)
+            # for nFrame in range(f_frames_np.shape[0]):
+            #     cv2.imwrite('./frames/' + "/ff_frame%04d.jpg" % nFrame, f_frames_np[nFrame,...])
+            #     cv2.imwrite('./frames/' + "/lf_frame%04d.jpg" % nFrame, l_frames_np[nFrame,...])
 
             # get prediction from model
             with torch.no_grad():
