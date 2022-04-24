@@ -167,7 +167,9 @@ def video_stream():
         # get prediction
         results = model.predict(captured_frames)
 
-        if type(results['prediction']) != type(None):
+        if results['prediction'] == '':
+            prediction = "සංඥාවන් හඳුනාගත නොහැකි විය​.. නැවත උත්සාහ කරන්න"
+        elif type(results['prediction']) != type(None):
             # Note: comment/remove after calculating avg prediction times -------------------------------------------
 
             # print("\nTime taken for lip frame extraction: %.1f sec" % results['lip_extraction_time'])
@@ -180,8 +182,6 @@ def video_stream():
             # End Note ----------------------------------------------------------------------------------------------
 
             prediction = results['prediction']
-        # elif results['prediction'] == '':
-        #     prediction = "පරිවර්තනය අසාර්ථකයි.. නැවත උත්සාහ කරන්න"
         else:
             prediction = "පරිවර්තනයේදී දෝශයක් ඇතිවිය.. නැවත උත්සාහ කරන්න"
         update_prediction()
